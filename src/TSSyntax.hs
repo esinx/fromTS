@@ -40,7 +40,8 @@ data Statement
 data Expression
   = Var Var -- global variables x and table indexing
   | Lit Literal -- literal values
-  | UnaryOp UnaryPrefix Expression -- unary operators
+  | UnaryOpPrefix UopPrefix Expression -- unary operators
+  | UnaryOpPostfix Expression UopPostfix -- unary operators
   | BinaryOp Expression Bop Expression -- binary operators
   | FunctionExpression (Maybe String) [Expression] Block -- function (x, y) { s } and (x, y) => s
   deriving (Eq, Show)
@@ -58,23 +59,23 @@ data UopPrefix
   | BitNeg -- `~` :: Int -> Int
   | TypeOf -- `typeof` :: a -> String
   | Spread -- `...` :: a -> [a]
-  | Dec -- `--` :: Int -> Int
-  | Inc -- `++` :: Int -> Int
-  | Plus -- `+` :: Int -> Int
-  | Minus -- `-` :: Int -> Int
+  | DecPre -- `--` :: Int -> Int
+  | IncPre -- `++` :: Int -> Int
+  | PlusUop -- `+` :: Int -> Int
+  | MinusUop -- `-` :: Int -> Int
   | Void -- `void` :: a -> Undefined  // TODO: MAKE THESE TYPES MATCH the literals
   deriving (Eq, Show, Enum, Bounded)
 
 data UopPostfix
-  = Dec -- `--` :: Int -> Int
-  | Inc -- `++` :: Int -> Int
+  = DecPost -- `--` :: Int -> Int
+  | IncPost -- `++` :: Int -> Int
   deriving (Eq, Show, Enum, Bounded)
 
 data Bop
   = Assign -- `=` :: a -> a -> a
-  | Plus -- `+`  :: Int -> Int -> Int
+  | PlusBop -- `+`  :: Int -> Int -> Int
   | PlusAssign -- `+=` :: Int -> Int -> Int // TODO: Doesn't need to be Int (e.g. can be string) types wrong
-  | Minus -- `-`  :: Int -> Int -> Int
+  | MinusBop -- `-`  :: Int -> Int -> Int
   | MinusAssign -- `-=` :: Int -> Int -> Int
   | Times -- `*`  :: Int -> Int -> Int
   | TimesAssign -- `*=` :: Int -> Int -> Int
