@@ -4,11 +4,12 @@ import TSError (Error)
 import TSType
 import TSSyntax
 
+import Control.Monad.State.Lazy
 
-typeCheckExpr :: Expr -> State TSTypeEnv (Either Error TSType)
+typeCheckExpr :: Expression -> State TSTypeEnv (Either Error TSType)
 typeCheckExpr = undefined
 
-typeCheckStmt :: Stmt -> State TSTypeEnv (Either Error ())
+typeCheckStmt :: Statement -> State TSTypeEnv (Either Error ())
 typeCheckStmt = undefined
 
 typeCheckProgram :: Block -> Either Error TSGlobalEnv
