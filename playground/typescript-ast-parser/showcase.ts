@@ -15,3 +15,16 @@ function foo() {
 
 console.log([a, b, c, x, y, z, foo()])
 console.log([a, b, c, x, y, z, foo()].reduce((acc, val) => acc + val, 0))
+
+interface Animal {
+	name: string
+	age: number
+}
+
+interface Dog extends Animal {
+	bark(): void
+}
+
+interface Cat extends Animal {
+	meow(): void
+}

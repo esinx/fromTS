@@ -1,6 +1,6 @@
 module Main where
 
-import Lib
+import FromTS (fromTS)
 
 main :: IO ()
-main = putStrLn someFunc
+main = 

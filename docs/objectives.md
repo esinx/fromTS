@@ -167,4 +167,14 @@ let x: any = "Hello, World!";
 let str: string = x as string;
 ```
 
+## Type Narrowing
+
+> `fromtTS` supports some Type Narrowing.
+
+```typescript
+let uncertain : string | number = Math.random() > 0.5 ? "Hello, World!" : 10;
+if(typeof uncertain === "string") {
+    console.log(uncertain.toUpperCase()); // typechecks
+}
+```
 
