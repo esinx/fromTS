@@ -31,11 +31,11 @@ data TSType
   | TObject (Map String TSType)
   | TFunction [TSType] TSType
 
-typeCheckExpr :: TSTypeEnv -> Expr -> Either Error TSType
+typeCheckExpr :: Expr -> State TSTypeEnv (Either Error TSType)
 typeCheckExpr = undefined
 
-typeCheckStmt :: TSTypeEnv -> Stmt -> Either Error ()
+typeCheckStmt :: Stmt -> State TSTypeEnv (Either Error ())
 typeCheckStmt = undefined
 
-typeCheckProgram :: Block -> Either Error ()
+typeCheckProgram :: Block -> Either Error (Map String TSType)
 typeCheckProgram = undefined
