@@ -124,126 +124,140 @@ data Var
   | Element Expression Expression -- t[1]
   deriving (Eq, Show)
 
--- class PP a where
---   pp :: a -> Doc
+class PP a where
+  pp :: a -> Doc
 
--- -- | Default operation for the pretty printer. Displays using standard formatting
--- -- rules, with generous use of indentation and newlines.
--- pretty :: (PP a) => a -> String
--- pretty = PP.render . pp
+-- | Default operation for the pretty printer. Displays using standard formatting
+-- rules, with generous use of indentation and newlines.
+pretty :: (PP a) => a -> String
+pretty = PP.render . pp
 
--- -- | Compact version. Displays its argument without newlines.
--- oneLine :: (PP a) => a -> String
--- oneLine = PP.renderStyle (PP.style {PP.mode = PP.OneLineMode}) . pp
+-- | Compact version. Displays its argument without newlines.
+oneLine :: (PP a) => a -> String
+oneLine = PP.renderStyle (PP.style {PP.mode = PP.OneLineMode}) . pp
 
--- instance PP Uop where
---   pp Neg = PP.char '-'
---   pp Not = PP.text "not"
---   pp Len = PP.char '#'
+instance PP UopPrefix where
+  -- pp Neg = PP.char '-'
+  -- pp Not = PP.text "not"
+  -- pp Len = PP.char '#'
+  pp _ = undefined
 
--- instance PP Bool where
---   pp :: Bool -> Doc
---   pp True = PP.text "true"
---   pp False = PP.text "false"
+instance PP UopPostfix where
+  -- pp Neg = PP.char '-'
+  -- pp Not = PP.text "not"
+  -- pp Len = PP.char '#'
+  pp _ = undefined
 
--- instance PP String where
---   pp :: String -> Doc
---   pp = PP.text
+instance PP Bool where
+  pp :: Bool -> Doc
+  pp True = PP.text "true"
+  pp False = PP.text "false"
 
--- instance PP Int where
---   pp :: Int -> Doc
---   pp = PP.int
+instance PP String where
+  pp :: String -> Doc
+  pp = PP.text
+
+instance PP Int where
+  pp :: Int -> Doc
+  pp = PP.int
 
 -- instance PP TableName where
 --   pp :: TableName -> Doc
 --   pp (TN x) = PP.text x
 
--- instance PP Var where
---   pp :: Var -> Doc
---   pp (Name n) = PP.text n
---   pp (Dot (Var v) k) = pp v <> PP.text "." <> pp k
---   pp (Dot t k) = PP.parens (pp t) <> PP.text "." <> pp k
---   pp (Proj (Var v) k) = pp v <> PP.brackets (pp k)
---   pp (Proj t k) = PP.parens (pp t) <> PP.brackets (pp k)
+instance PP Var where
+  pp :: Var -> Doc
+  -- pp (Name n) = PP.text n
+  -- pp (Dot (Var v) k) = pp v <> PP.text "." <> pp k
+  -- pp (Dot t k) = PP.parens (pp t) <> PP.text "." <> pp k
+  -- pp (Proj (Var v) k) = pp v <> PP.brackets (pp k)
+  -- pp (Proj t k) = PP.parens (pp t) <> PP.brackets (pp k)
+  pp _ = undefined
 
--- instance PP Value where
---   pp :: Value -> Doc
---   pp (IntVal i) = pp i
---   pp (BoolVal b) = pp b
---   pp NilVal = PP.text "nil"
---   pp (StringVal s) = PP.text ("\"" <> s <> "\"")
---   pp (TableVal tn) = PP.text "<" <> pp tn <> PP.text ">"
+instance PP Literal where
+  pp :: Literal -> Doc
+  -- pp (IntVal i) = pp i
+  -- pp (BoolVal b) = pp b
+  -- pp NilVal = PP.text "nil"
+  -- pp (StringVal s) = PP.text ("\"" <> s <> "\"")
+  -- pp (TableVal tn) = PP.text "<" <> pp tn <> PP.text ">"
+  pp _ = undefined
 
--- isBase :: Expression -> Bool
+isBase :: Expression -> Bool
 -- isBase TableConst {} = True
 -- isBase Val {} = True
 -- isBase Var {} = True
 -- isBase Op1 {} = True
--- isBase _ = False
+isBase _ = False
 
--- instance PP Bop where
---   pp :: Bop -> Doc
---   pp Plus = PP.char '+'
---   pp Minus = PP.char '-'
---   pp Times = PP.char '*'
---   pp Divide = PP.text "//"
---   pp Modulo = PP.text "%"
---   pp Gt = PP.char '>'
---   pp Ge = PP.text ">="
---   pp Lt = PP.char '<'
---   pp Le = PP.text "<="
---   pp Eq = PP.text "=="
---   pp Concat = PP.text ".."
+instance PP Bop where
+  pp :: Bop -> Doc
+  -- pp Plus = PP.char '+'
+  -- pp Minus = PP.char '-'
+  -- pp Times = PP.char '*'
+  -- pp Divide = PP.text "//"
+  -- pp Modulo = PP.text "%"
+  -- pp Gt = PP.char '>'
+  -- pp Ge = PP.text ">="
+  -- pp Lt = PP.char '<'
+  -- pp Le = PP.text "<="
+  -- pp Eq = PP.text "=="
+  -- pp Concat = PP.text ".."
+  pp _ = undefined
 
--- instance PP Expression where
---   pp :: Expression -> Doc
---   pp (Var v) = pp v
---   pp (Val v) = pp v
---   pp (Op1 o v) = pp o <+> if isBase v then pp v else PP.parens (pp v)
---   pp e@Op2 {} = ppPrec 0 e
---     where
---       ppPrec n (Op2 e1 bop e2) =
---         ppParens (level bop < n) $
---           ppPrec (level bop) e1 <+> pp bop <+> ppPrec (level bop + 1) e2
---       ppPrec _ e' = pp e'
---       ppParens b = if b then PP.parens else id
---   pp (TableConst fs) = PP.braces (PP.sep (PP.punctuate PP.comma (map pp fs)))
+instance PP Expression where
+  pp :: Expression -> Doc
+  -- pp (Var v) = pp v
+  -- pp (Val v) = pp v
+  -- pp (Op1 o v) = pp o <+> if isBase v then pp v else PP.parens (pp v)
+  -- pp e@Op2 {} = ppPrec 0 e
+  --   where
+  --     ppPrec n (Op2 e1 bop e2) =
+  --       ppParens (level bop < n) $
+  --         ppPrec (level bop) e1 <+> pp bop <+> ppPrec (level bop + 1) e2
+  --     ppPrec _ e' = pp e'
+  --     ppParens b = if b then PP.parens else id
+  -- pp (TableConst fs) = PP.braces (PP.sep (PP.punctuate PP.comma (map pp fs)))
+  pp _ = undefined
 
 -- instance PP TableField where
 --   pp :: TableField -> Doc
 --   pp (FieldName name e) = pp name <+> PP.equals <+> pp e
 --   pp (FieldKey e1 e2) = PP.brackets (pp e1) <+> PP.equals <+> pp e2
 
--- instance PP Block where
---   pp :: Block -> Doc
---   pp (Block [s]) = pp s
---   pp (Block ss) = PP.vcat (map pp ss)
+instance PP Block where
+  pp :: Block -> Doc
+  -- pp (Block [s]) = pp s
+  -- pp (Block ss) = PP.vcat (map pp ss)
+  pp _ = undefined
 
--- ppSS :: [Statement] -> Doc
--- ppSS ss = PP.vcat (map pp ss)
+ppSS :: [Statement] -> Doc
+ppSS ss = PP.vcat (map pp ss)
 
--- instance PP Statement where
---   pp :: Statement -> Doc
---   pp (Assign x e) = pp x <+> PP.equals <+> pp e
---   pp (If guard b1 b2) =
---     PP.hang (PP.text "if" <+> pp guard <+> PP.text "then") 2 (pp b1)
---       PP.$$ PP.nest 2 (PP.text "else" PP.$$ pp b2)
---       PP.$$ PP.text "end"
---   pp (While guard e) =
---     PP.hang (PP.text "while" <+> pp guard <+> PP.text "do") 2 (pp e)
---       PP.$+$ PP.text "end"
---   pp Empty = PP.semi
---   pp (Repeat b e) =
---     PP.hang (PP.text "repeat") 2 (pp b)
---       PP.$+$ PP.text "until" <+> pp e
+instance PP Statement where
+  pp :: Statement -> Doc
+  -- pp (Assign x e) = pp x <+> PP.equals <+> pp e
+  -- pp (If guard b1 b2) =
+  --   PP.hang (PP.text "if" <+> pp guard <+> PP.text "then") 2 (pp b1)
+  --     PP.$$ PP.nest 2 (PP.text "else" PP.$$ pp b2)
+  --     PP.$$ PP.text "end"
+  -- pp (While guard e) =
+  --   PP.hang (PP.text "while" <+> pp guard <+> PP.text "do") 2 (pp e)
+  --     PP.$+$ PP.text "end"
+  -- pp Empty = PP.semi
+  -- pp (Repeat b e) =
+  --   PP.hang (PP.text "repeat") 2 (pp b)
+  --     PP.$+$ PP.text "until" <+> pp e
+  pp _ = undefined
 
--- level :: Bop -> Int
+level :: Bop -> Int
 -- level Times = 7
 -- level Divide = 7
 -- level Plus = 5
 -- level Minus = 5
 -- level Concat = 4
 -- level _ = 3 -- comparison operators
+level _ = undefined
 
 -- instance (PP a) => PP (Map Value a) where
 --   pp :: (PP a) => Map Value a -> Doc
@@ -258,48 +272,49 @@ data Var
 --     where
 --       ppa (s, v2) = pp s <+> PP.text "=" <+> pp v2
 
--- sampleVar :: IO ()
--- sampleVar = QC.sample' (arbitrary :: Gen Var) >>= mapM_ (print . pp)
+sampleVar :: IO ()
+sampleVar = QC.sample' (arbitrary :: Gen Var) >>= mapM_ (print . pp)
 
--- sampleExp :: IO ()
--- sampleExp = QC.sample' (arbitrary :: Gen Expression) >>= mapM_ (print . pp)
+sampleExp :: IO ()
+sampleExp = QC.sample' (arbitrary :: Gen Expression) >>= mapM_ (print . pp)
 
--- sampleStat :: IO ()
--- sampleStat = QC.sample' (arbitrary :: Gen Statement) >>= mapM_ (print . pp)
+sampleStat :: IO ()
+sampleStat = QC.sample' (arbitrary :: Gen Statement) >>= mapM_ (print . pp)
 
--- quickCheckN :: (QC.Testable prop) => Int -> prop -> IO ()
--- quickCheckN n = QC.quickCheckWith $ QC.stdArgs {QC.maxSuccess = n, QC.maxSize = 100}
+quickCheckN :: (QC.Testable prop) => Int -> prop -> IO ()
+quickCheckN n = QC.quickCheckWith $ QC.stdArgs {QC.maxSuccess = n, QC.maxSize = 100}
 
--- -- | Generate a small set of names for generated tests. These names are guaranteed to not include
--- -- reserved words
--- genName :: Gen Name
--- genName = QC.elements ["x", "X", "y", "x0", "X0", "xy", "XY"]
+-- | Generate a small set of names for generated tests. These names are guaranteed to not include
+-- reserved words
+genName :: Gen Name
+genName = QC.elements ["x", "X", "y", "x0", "X0", "xy", "XY"]
 
--- -- | Generate a string literal, being careful about the characters that it may contain
--- genStringLit :: Gen String
--- genStringLit = escape <$> QC.listOf (QC.elements stringLitChars)
---   where
---     -- escape special characters appearing in the string,
---     escape :: String -> String
---     escape = foldr Char.showLitChar ""
---     -- generate strings containing printable characters or spaces, but not including '\"'
---     stringLitChars :: [Char]
---     stringLitChars = filter (\c -> c /= '\"' && (Char.isSpace c || Char.isPrint c)) ['\NUL' .. '~']
+-- | Generate a string literal, being careful about the characters that it may contain
+genStringLit :: Gen String
+genStringLit = escape <$> QC.listOf (QC.elements stringLitChars)
+  where
+    -- escape special characters appearing in the string,
+    escape :: String -> String
+    escape = foldr Char.showLitChar ""
+    -- generate strings containing printable characters or spaces, but not including '\"'
+    stringLitChars :: [Char]
+    stringLitChars = filter (\c -> c /= '\"' && (Char.isSpace c || Char.isPrint c)) ['\NUL' .. '~']
 
--- -- | Generate a size-controlled global variable or table field
--- genVar :: Int -> Gen Var
+-- | Generate a size-controlled global variable or table field
+genVar :: Int -> Gen Var
 -- genVar 0 = Name <$> genName
 -- genVar n =
 --   QC.frequency
 --     [ (1, Name <$> genName),
---       (n, Dot <$> genExp n' <*> genName),
+--       (n, Dot <$> genExp n' <*> genName)
 --       (n, Proj <$> genExp n' <*> genExp n')
 --     ]
 --   where
 --     n' = n `div` 2
+genVar _ = undefined
 
--- -- | Generate a size-controlled expression
--- genExp :: Int -> Gen Expression
+-- | Generate a size-controlled expression
+genExp :: Int -> Gen Expression
 -- genExp 0 = QC.oneof [Var <$> genVar 0, Val <$> arbitrary]
 -- genExp n =
 --   QC.frequency
@@ -311,6 +326,7 @@ data Var
 --     ]
 --   where
 --     n' = n `div` 2
+genExp _ = undefined
 
 -- -- | Generate a list of fields in a table constructor epression.
 -- -- We limit the size of the table to avoid size blow up.
@@ -328,8 +344,8 @@ data Var
 --   where
 --     n' = n `div` 2
 
--- -- | Generate a size-controlled statement
--- genStatement :: Int -> Gen Statement
+-- | Generate a size-controlled statement
+genStatement :: Int -> Gen Statement
 -- genStatement n | n <= 1 = QC.oneof [Assign <$> genVar 0 <*> genExp 0, return Empty]
 -- genStatement n =
 --   QC.frequency
@@ -342,60 +358,63 @@ data Var
 --     ]
 --   where
 --     n' = n `div` 2
+genStatement _ = undefined
 
--- genBlock :: Int -> Gen Block
--- genBlock n = Block <$> genStmts n
---   where
---     genStmts 0 = pure []
---     genStmts n =
---       QC.frequency
---         [ (1, return []),
---           (n, (:) <$> genStatement n' <*> genStmts n')
---         ]
---       where
---         n' = n `div` 2
+genBlock :: Int -> Gen Block
+genBlock n = Block <$> genStmts n
+  where
+    genStmts 0 = pure []
+    genStmts n =
+      QC.frequency
+        [ (1, return []),
+          (n, (:) <$> genStatement n' <*> genStmts n')
+        ]
+      where
+        n' = n `div` 2
 
 -- instance Arbitrary TableName where
 --   arbitrary :: Gen TableName
 --   arbitrary = QC.elements [TN "_", TN "_G", TN "_x", TN "_t1"]
 
--- instance Arbitrary Var where
---   arbitrary :: Gen Var
---   arbitrary = QC.sized genVar
---   shrink :: Var -> [Var]
---   shrink (Name n) = []
---   shrink (Dot e n) = [Dot e' n | e' <- shrink e]
---   shrink (Proj e1 e2) =
---     [Proj e1' e2 | e1' <- shrink e1]
---       ++ [Proj e1 e2' | e2' <- shrink e2]
+instance Arbitrary Var where
+  arbitrary :: Gen Var
+  arbitrary = QC.sized genVar
+  shrink :: Var -> [Var]
+  -- shrink (Name n) = []
+  -- shrink (Proj e1 e2) =
+  --   [Proj e1' e2 | e1' <- shrink e1]
+  --     ++ [Proj e1 e2' | e2' <- shrink e2]
+  -- shrink (Dot e n) = [Dot e' n | e' <- shrink e]
+  shrink _ = undefined
 
--- instance Arbitrary Statement where
---   arbitrary :: Gen Statement
---   arbitrary = QC.sized genStatement
---   shrink :: Statement -> [Statement]
---   shrink (Assign v e) =
---     [Assign v' e | v' <- shrink v]
---       ++ [Assign v e' | e' <- shrink e]
---   shrink (If e b1 b2) =
---     first b1
---       ++ first b2
---       ++ [If e' b1 b2 | e' <- shrink e]
---       ++ [If e b1' b2 | b1' <- shrink b1]
---       ++ [If e b1 b2' | b2' <- shrink b2]
---   shrink (While e b) =
---     first b
---       ++ [While e' b | e' <- shrink e]
---       ++ [While e b' | b' <- shrink b]
---   shrink Empty = []
---   shrink (Repeat b e) =
---     first b
---       ++ [Repeat b' e | b' <- shrink b]
---       ++ [Repeat b e' | e' <- shrink e]
+instance Arbitrary Statement where
+  arbitrary :: Gen Statement
+  arbitrary = QC.sized genStatement
+  shrink :: Statement -> [Statement]
+  -- shrink (Assign v e) =
+  --   [Assign v' e | v' <- shrink v]
+  --     ++ [Assign v e' | e' <- shrink e]
+  -- shrink (If e b1 b2) =
+  --   first b1
+  --     ++ first b2
+  --     ++ [If e' b1 b2 | e' <- shrink e]
+  --     ++ [If e b1' b2 | b1' <- shrink b1]
+  --     ++ [If e b1 b2' | b2' <- shrink b2]
+  -- shrink (While e b) =
+  --   first b
+  --     ++ [While e' b | e' <- shrink e]
+  --     ++ [While e b' | b' <- shrink b]
+  -- shrink (Repeat b e) =
+  --   first b
+  --     ++ [Repeat b' e | b' <- shrink b]
+  --     ++ [Repeat b e' | e' <- shrink e]
+  -- shrink Empty = []
+  shrink _ = undefined
 
--- -- | access the first statement in a block, if one exists
--- first :: Block -> [Statement]
--- first (Block []) = []
--- first (Block (x : _)) = [x]
+-- | access the first statement in a block, if one exists
+first :: Block -> [Statement]
+first (Block []) = []
+first (Block (x : _)) = [x]
 
 -- -- | access expressions in a table field
 -- getExp :: TableField -> [Expression]
@@ -411,36 +430,41 @@ data Var
 --     [FieldKey e1' e2 | e1' <- shrink e1]
 --       ++ [FieldKey e1 e2' | e2' <- shrink e2]
 
--- instance Arbitrary Block where
---   arbitrary :: Gen Block
---   arbitrary = QC.sized genBlock
---   shrink :: Block -> [Block]
---   shrink (Block ss) = [Block ss' | ss' <- shrink ss]
+instance Arbitrary Block where
+  arbitrary :: Gen Block
+  arbitrary = QC.sized genBlock
+  shrink :: Block -> [Block]
+  shrink (Block ss) = [Block ss' | ss' <- shrink ss]
 
--- instance Arbitrary Expression where
---   arbitrary :: Gen Expression
---   arbitrary = QC.sized genExp
+instance Arbitrary Expression where
+  arbitrary :: Gen Expression
+  arbitrary = QC.sized genExp
 
---   shrink :: Expression -> [Expression]
---   shrink (Val v) = Val <$> shrink v
---   shrink (Var v) = Var <$> shrink v
---   shrink (Op1 o e) = e : [Op1 o e' | e' <- shrink e]
---   shrink (Op2 e1 o e2) =
---     [Op2 e1' o e2 | e1' <- shrink e1]
---       ++ [Op2 e1 o e2' | e2' <- shrink e2]
---       ++ [e1, e2]
---   shrink (TableConst fs) = concatMap getExp fs ++ (TableConst <$> shrink fs)
+  shrink :: Expression -> [Expression]
+  -- shrink (Val v) = Val <$> shrink v
+  -- shrink (Var v) = Var <$> shrink v
+  -- shrink (Op1 o e) = e : [Op1 o e' | e' <- shrink e]
+  -- shrink (Op2 e1 o e2) =
+  --   [Op2 e1' o e2 | e1' <- shrink e1]
+  --     ++ [Op2 e1 o e2' | e2' <- shrink e2]
+  --     ++ [e1, e2]
+  -- shrink (TableConst fs) = concatMap getExp fs ++ (TableConst <$> shrink fs)
+  shrink _ = undefined
 
--- instance Arbitrary Uop where
---   arbitrary :: Gen Uop
---   arbitrary = QC.arbitraryBoundedEnum
+instance Arbitrary UopPrefix where
+  arbitrary :: Gen UopPrefix
+  arbitrary = QC.arbitraryBoundedEnum
 
--- instance Arbitrary Bop where
---   arbitrary :: Gen Bop
---   arbitrary = QC.arbitraryBoundedEnum
+instance Arbitrary UopPostfix where
+  arbitrary :: Gen UopPostfix
+  arbitrary = QC.arbitraryBoundedEnum
 
--- shrinkStringLit :: String -> [String]
--- shrinkStringLit s = filter (/= '\"') <$> shrink s
+instance Arbitrary Bop where
+  arbitrary :: Gen Bop
+  arbitrary = QC.arbitraryBoundedEnum
+
+shrinkStringLit :: String -> [String]
+shrinkStringLit s = filter (/= '\"') <$> shrink s
 
 -- instance Arbitrary Value where
 --   arbitrary :: Gen Value
