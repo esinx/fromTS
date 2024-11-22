@@ -50,12 +50,12 @@ data Literal
   = IntegerLiteral Int -- 1
   | StringLiteral String -- "abd" or 'abd' oor `abd`? (support templates later?)
   | BooleanLiteral Bool -- true or false
-  | NullLit
+  | NullLiteral -- null
+  | UndefinedLiteral -- undefined
   deriving (Eq, Show, Ord)
 
 data UopPrefix
-  = Neg -- `-` :: Int -> Int
-  | Not -- `!` :: a -> Bool
+  = Not -- `!` :: a -> Bool
   | BitNeg -- `~` :: Int -> Int
   | TypeOf -- `typeof` :: a -> String
   | Spread -- `...` :: a -> [a]
@@ -466,20 +466,20 @@ instance Arbitrary Bop where
 shrinkStringLit :: String -> [String]
 shrinkStringLit s = filter (/= '\"') <$> shrink s
 
--- instance Arbitrary Value where
---   arbitrary :: Gen Value
---   arbitrary =
---     QC.oneof
---       [ IntVal <$> arbitrary,
---         BoolVal <$> arbitrary,
---         pure NilVal,
---         StringVal <$> genStringLit
---         -- note: do not generate table values
---       ]
+instance Arbitrary Literal where
+  arbitrary :: Gen Literal
+  arbitrary =
+    QC.oneof
+      [ IntegerLiteral <$> arbitrary,
+        BooleanLiteral <$> arbitrary,
+        pure NullLiteral,
+        pure UndefinedLiteral,
+        StringLiteral <$> genStringLit
+      ]
 
---   shrink :: Value -> [Value]
---   shrink (IntVal n) = IntVal <$> shrink n
---   shrink (BoolVal b) = BoolVal <$> shrink b
---   shrink NilVal = []
---   shrink (StringVal s) = StringVal <$> shrinkStringLit s
---   shrink (TableVal _) = []
+  shrink :: Literal -> [Literal]
+  shrink (IntegerLiteral n) = IntegerLiteral <$> shrink n
+  shrink (BooleanLiteral b) = BooleanLiteral <$> shrink b
+  shrink NullLiteral = []
+  shrink UndefinedLiteral = []
+  shrink (StringLiteral s) = StringLiteral <$> shrinkStringLit s
