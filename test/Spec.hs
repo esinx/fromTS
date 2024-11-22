@@ -95,6 +95,6 @@ prop_ioDifferential b =
         result <- readProcessWithExitCode "tsc" [outputFile] ""
         return $ property $ match result typeCheckResult
   where
-    match (ExitSuccess, _, _) (Left _) = True
-    match (ExitFailure _, _, _) (Right _) = True
+    match (ExitSuccess, _, _) (Right _) = True
+    match (ExitFailure _, _, _) (Left _) = True
     match _ _ = False
