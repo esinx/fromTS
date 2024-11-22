@@ -48,7 +48,7 @@ data Expression
 
 data Literal
   = IntegerLiteral Int -- 1
-  | StringLiteral String -- "abd" or 'abd' oor `abd`? (support templates later?)
+  | StringLiteral String -- "abd" or 'abd' or `abd`? (support templates later?)
   | BooleanLiteral Bool -- true or false
   | NullLiteral -- null
   | UndefinedLiteral -- undefined

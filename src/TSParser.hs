@@ -20,25 +20,21 @@ import Text.PrettyPrint (Doc, (<+>))
 import Text.PrettyPrint qualified as PP
 import Text.Read (readMaybe)
 
+-- | Tests parsing the pretty printed value of a literal, should match
 prop_roundtrip_lit :: Literal -> Bool
-prop_roundtrip_lit v = undefined
+prop_roundtrip_lit v = P.parse literalP "" (pretty v) == Right v
 
--- P.parse valueP (pretty v) == Right v
-
+-- | Tests parsing the pretty printed value of an expression, should match
 prop_roundtrip_exp :: Expression -> Bool
-prop_roundtrip_exp e = undefined
+prop_roundtrip_exp e = P.parse expP "" (pretty e) == Right e
 
--- P.parse expP (pretty e) == Right e
-
+-- | Tests parsing the pretty printed value of a statement, should match
 prop_roundtrip_stat :: Statement -> Bool
-prop_roundtrip_stat s = undefined
+prop_roundtrip_stat s = P.parse statementP "" (pretty s) == Right s
 
--- P.parse statementP (pretty s) == Right s
-
+-- | Tests parsing the pretty printed value of a block, should match
 prop_roundtrip_block :: Block -> Bool
-prop_roundtrip_block s = undefined
-
--- P.parse blockP (pretty s) == Right s
+prop_roundtrip_block s = P.parse blockP "" (pretty s) == Right s
 
 --------------------------------------------------------------------------------
 
@@ -242,7 +238,7 @@ reserved =
 nameP :: Parser Name
 nameP = undefined
 
--- >>> P.parse (many uopPrefixP) "" "- - # --"
+-- >>> P.parse (many uopPrefixP) "" "- - ... --"
 -- Left (line 1, column 1):
 -- unexpected " "
 -- expecting "--"
@@ -273,8 +269,8 @@ uopPostfix =
 
 -- >>> P.parse (many bopP) "" "+ >= .."
 -- Right [Plus,Ge,Concat]
--- >>> P.parse (many bopP) "" ".. >>= +   <= - //  \n== % * <<===> >"
--- Right [Concat,Gt,Ge,Plus,Le,Minus,Divide,Eq,Modulo,Times,Lt,Le,Eq,Gt,Gt]
+-- >>> P.parse (many bopP) "" "|| >>= +   <= - //  \n== % * <<===> >"
+-- Right [Or,Gt,Ge,Plus,Le,Minus,Divide,Eq,Modulo,Times,Lt,Le,Eq,Gt,Gt]
 bopP :: Parser Bop
 bopP = undefined
 
@@ -438,13 +434,31 @@ test_exp :: Test
 test_exp =
   "parsing expressions"
     ~: TestList
-      []
+      [ P.parse (many varP) "" "x y z" ~?= Right [Name "x", Name "y", Name "z"],
+        P.parse (many nameP) "" "x sfds _ nil" ~?= Right ["x", "sfds", "_"],
+        P.parse (many uopPrefixP) "" "- - ... --" ~?= Right [MinusUop, MinusUop, Spread, DecPre],
+        P.parse (many bopP) "" "+ >= ||" ~?= Right [PlusBop, Ge, Or]
+      ]
 
 test_stat :: Test
 test_stat =
   "parsing statements"
     ~: TestList
-      []
+      [ P.parse statementP "" "const x = 3" ~?= Right (ConstAssignment (Name "x") (Lit (IntegerLiteral 3))),
+        P.parse statementP "" "if (x) { let y = undefined } else { const y = null }"
+          ~?= Right
+            ( If
+                (Var (Name "x"))
+                (Block [LetAssignment (Name "y") (Lit UndefinedLiteral)])
+                (Block [ConstAssignment (Name "y") (Lit NullLiteral)])
+            )
+            -- P.parse statementP "" "while (null) { x += 1 }"
+            --   ~?= Right
+            --     ( While
+            --         (Lit NullLiteral)
+            --         (Block [PlusBop (Var (Name "x")) (Lit (IntegerLiteral 1))])
+            --     )
+      ]
 
 -- >>> runTestTT test_stat
 -- Counts {cases = 5, tried = 5, errors = 0, failures = 0}
