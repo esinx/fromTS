@@ -1,5 +1,6 @@
 module TSType where
 
+import Control.Applicative ((<|>))
 import Control.Monad.State
 import Control.Monad.State qualified as S
 import Data.Map (Map)
@@ -52,3 +53,21 @@ updateGlobalEnv :: String -> TSType -> State TSTypeEnv ()
 updateGlobalEnv name t = do
   env <- get
   put $ env {globalEnv = Map.insert name t (globalEnv env)}
+
+updateLocalEnv :: String -> TSType -> State TSTypeEnv ()
+updateLocalEnv name t = do
+  env <- get
+  put $ env {localEnv = Map.insert name t (localEnv env)}
+
+updateObjectEnv :: String -> TSType -> State TSTypeEnv ()
+updateObjectEnv name t = do
+  env <- get
+  put $ env {objectEnv = Map.insert name t (objectEnv env)}
+
+lookupVarType :: String -> State TSTypeEnv (Maybe TSType)
+lookupVarType name = do
+  env <- get
+  return $ Map.lookup name (localEnv env) <|> Map.lookup name (globalEnv env)
+
+lookupObjectType :: String -> State TSTypeEnv (Maybe TSType)
+lookupObjectType name = gets (Map.lookup name . objectEnv)
