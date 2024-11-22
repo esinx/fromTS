@@ -8,6 +8,7 @@ import TSSyntax
 import TSType
 
 -- Q: Can state handle the context for diverging branches e.g. if-then-else?
+-- A?: save and restore using get and put
 
 -- | checks if a type is a subtype of another type
 isSubtype :: TSType -> TSType -> Bool
