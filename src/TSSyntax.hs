@@ -22,8 +22,8 @@ instance Monoid Block where
   mempty = Block []
 
 data Statement
-  = ConstAssignment Expression -- const x = e
-  | LetAssignment Expression -- let x = e
+  = ConstAssignment Var Expression -- const x = e
+  | LetAssignment Var Expression -- let x = e
   | If Expression Block Block -- if (e) { s1 } else { s2 }
   | For Expression Expression Expression Block -- for (e1; e2; e3) { s }
   | While Expression Block -- while (e) { s }

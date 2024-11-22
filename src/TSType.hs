@@ -14,6 +14,7 @@ data TSTypeEnv = TSTypeEnv
     localEnv :: TSLocalEnv,
     objectEnv :: TSObjectEnv
   }
+  deriving (Show, Eq)
 
 data TSType
   = TBoolean -- boolean

@@ -13,7 +13,8 @@ isSubtype t1 t2 = t1 == t2
 
 -- | typechecks an expression
 typeCheckExpr :: Expression -> State TSTypeEnv (Either Error TSType)
-typeCheckExpr = undefined
+typeCheckExpr (Lit (BooleanLiteral _)) = return $ Right TBoolean
+typeCheckExpr _ = undefined
 
 -- | typechecks a statement
 typeCheckStmt :: Statement -> State TSTypeEnv (Either Error ())

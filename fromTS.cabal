@@ -33,6 +33,7 @@ common common-stanza
     , mtl
     , doctest
     , parsec
+    , process
   default-language:
     GHC2021
   default-extensions:
