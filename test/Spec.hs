@@ -59,16 +59,10 @@ test_typeCheckStmt =
           )
           initialTSTypeEnv
           ~?= ( Right (),
-                TSTypeEnv
+                initialTSTypeEnv
                   { globalEnv =
                       Map.fromList
-                        [ ("x", TBoolean)
-                        ],
-                    localEnv = Map.empty,
-                    objectEnv =
-                      Map.fromList
-                        [ ("object", TObject Map.empty)
-                        ]
+                        [("x", TBoolean)]
                   }
               )
       ]

@@ -1,5 +1,7 @@
 module TSType where
 
+import Control.Monad.State
+import Control.Monad.State qualified as S
 import Data.Map (Map)
 import Data.Map qualified as Map
 
@@ -45,3 +47,8 @@ initialTSTypeEnv =
           [ ("object", TObject Map.empty)
           ]
     }
+
+updateGlobalEnv :: String -> TSType -> State TSTypeEnv ()
+updateGlobalEnv name t = do
+  env <- get
+  put $ env {globalEnv = Map.insert name t (globalEnv env)}

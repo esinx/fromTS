@@ -7,6 +7,8 @@ import TSError (Error)
 import TSSyntax
 import TSType
 
+-- Q: Can state handle the context for diverging branches e.g. if-then-else?
+
 -- | checks if a type is a subtype of another type
 isSubtype :: TSType -> TSType -> Bool
 isSubtype t1 t2 = t1 == t2
@@ -33,8 +35,8 @@ typeCheckBlock (Block (s : ss)) = do
 -- and empty variable bindings
 typeCheckProgram :: Block -> Either Error TSGlobalEnv
 typeCheckProgram b = do
-  let (r, TSTypeEnv {globalEnv, localEnv, objectEnv}) =
+  let (r, env) =
         S.runState (typeCheckBlock b) initialTSTypeEnv
   case r of
     Left e -> Left e
-    Right _ -> Right globalEnv
+    Right _ -> Right $ globalEnv env
