@@ -1,10 +1,13 @@
 module TSType where
 
 import Control.Applicative ((<|>))
+import Control.Monad.Except (throwError)
+import Control.Monad.Reader
 import Control.Monad.State
 import Control.Monad.State qualified as S
 import Data.Map (Map)
 import Data.Map qualified as Map
+import TSError
 
 type TSGlobalEnv = Map String TSType
 
@@ -38,6 +41,8 @@ data TSType
   | TIntersection [TSType]
   deriving (Show, Eq)
 
+type TSTypeChecker = ReaderT TSTypeEnv (Either Error)
+
 initialTSTypeEnv :: TSTypeEnv
 initialTSTypeEnv =
   TSTypeEnv
@@ -49,25 +54,31 @@ initialTSTypeEnv =
           ]
     }
 
-updateGlobalEnv :: String -> TSType -> State TSTypeEnv ()
+updateGlobalEnv :: String -> TSType -> TSTypeChecker ()
 updateGlobalEnv name t = do
-  env <- get
-  put $ env {globalEnv = Map.insert name t (globalEnv env)}
+  env <- ask
+  local (\env -> env {objectEnv = Map.insert name t (globalEnv env)}) (return ())
 
-updateLocalEnv :: String -> TSType -> State TSTypeEnv ()
+updateLocalEnv :: String -> TSType -> TSTypeChecker ()
 updateLocalEnv name t = do
-  env <- get
-  put $ env {localEnv = Map.insert name t (localEnv env)}
+  env <- ask
+  local (\env -> env {objectEnv = Map.insert name t (localEnv env)}) (return ())
 
-updateObjectEnv :: String -> TSType -> State TSTypeEnv ()
+updateObjectEnv :: String -> TSType -> TSTypeChecker ()
 updateObjectEnv name t = do
-  env <- get
-  put $ env {objectEnv = Map.insert name t (objectEnv env)}
+  env <- ask
+  local (\env -> env {objectEnv = Map.insert name t (objectEnv env)}) (return ())
 
-lookupVarType :: String -> State TSTypeEnv (Maybe TSType)
+lookupVarType :: String -> TSTypeChecker TSType
 lookupVarType name = do
-  env <- get
-  return $ Map.lookup name (localEnv env) <|> Map.lookup name (globalEnv env)
+  env <- ask
+  case Map.lookup name (localEnv env) <|> Map.lookup name (globalEnv env) of
+    Just t -> return t
+    Nothing -> throwError $ TypeError $ "Variable " ++ name ++ " not found in the environment"
 
-lookupObjectType :: String -> State TSTypeEnv (Maybe TSType)
-lookupObjectType name = gets (Map.lookup name . objectEnv)
+lookupObjectType :: String -> TSTypeChecker TSType
+lookupObjectType name = do
+  env <- ask
+  case Map.lookup name (objectEnv env) of
+    Just t -> return t
+    Nothing -> throwError $ TypeError $ "Object " ++ name ++ " not found in the environment"

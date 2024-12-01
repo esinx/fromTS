@@ -1,3 +1,4 @@
+import Control.Monad.Reader
 import Control.Monad.State
 import Control.Monad.State qualified as S
 import Data.Map qualified as Map
@@ -42,7 +43,7 @@ test_typeCheckExpr :: Test
 test_typeCheckExpr =
   "expression type checking tests"
     ~: TestList
-      [ S.evalState (typeCheckExpr (Lit (BooleanLiteral True))) initialTSTypeEnv
+      [ runReaderT (typeCheckExpr (Lit (BooleanLiteral True))) initialTSTypeEnv
           ~?= Right TBoolean
       ]
 
@@ -50,7 +51,7 @@ test_typeCheckStmt :: Test
 test_typeCheckStmt =
   "statement type checking tests"
     ~: TestList
-      [ S.runState
+      [ runReaderT
           ( typeCheckStmt
               ( LetAssignment
                   (Name "x")
@@ -58,13 +59,7 @@ test_typeCheckStmt =
               )
           )
           initialTSTypeEnv
-          ~?= ( Right (),
-                initialTSTypeEnv
-                  { globalEnv =
-                      Map.fromList
-                        [("x", TBoolean)]
-                  }
-              )
+          ~?= Right ()
       ]
 
 -- properties for the typechecker
@@ -72,8 +67,9 @@ prop_subtypeReflexive :: TSType -> Bool
 prop_subtypeReflexive t = isSubtype t t
 
 prop_supertypeNever :: TSType -> Bool
-prop_supertypeNever t = isSubtype t TNever
+prop_supertypeNever = isSubtype TNever
 
+-- TODO: clarify the subtyping relations
 prop_subtypeVoid :: TSType -> Bool
 prop_subtypeVoid = isSubtype TVoid
 
