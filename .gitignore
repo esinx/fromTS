@@ -3,3 +3,4 @@
 .DS_Store
 dist-newstyle
 node_modules
+test/output.*
