@@ -31,7 +31,7 @@ const z2: { a: number, b: string, c: number } = x; // Error
 const func1 = (x: number): number | string => x;
 const func2 = (x: number | string): number => 1;
 
-type test = typeof func2 extends typeof func1 ? 1 : 2; // 2
+type test = typeof func2 extends typeof func1 ? 1 : 2; // 1
 
 declare const union: boolean | number;
 const union2: boolean | number | undefined = union; // Error
