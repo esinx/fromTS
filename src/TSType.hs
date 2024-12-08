@@ -24,19 +24,24 @@ data TSTypeEnv = TSTypeEnv
 
 data TSType
   = TBoolean -- boolean
+  | TBooleanLiteral Bool -- true, false
   | TNumber -- number
+  | TNumberLiteral Double -- 1, 2.3
   | TString -- string
+  | TStringLiteral String -- "hello"
   | TArray TSType -- Array<T>
   | TTuple TSType TSType -- [T, U]
   | TEnum (Map String TSType)
-  | TObject (Map String TSType) -- alias, interface, class
+  | TBracket -- {}
+  | TObject
+  | TUserObject (Map String TSType)
   | TFunction [TSType] TSType
-  | TUnknown
-  | TAny
+  | TUnknown -- proper top
+  | TAny -- chaotic top type
+  | TNever -- bottom type
   | TVoid
   | TNull
   | TUndefined
-  | TNever
   | TUnion [TSType]
   | TIntersection [TSType]
   deriving (Show, Eq)
@@ -48,10 +53,7 @@ initialTSTypeEnv =
   TSTypeEnv
     { globalEnv = Map.empty,
       localEnv = Map.empty,
-      objectEnv =
-        Map.fromList
-          [ ("object", TObject Map.empty)
-          ]
+      objectEnv = Map.empty
     }
 
 updateGlobalEnv :: String -> TSType -> TSTypeChecker ()

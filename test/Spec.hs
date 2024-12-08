@@ -55,6 +55,7 @@ test_typeCheckStmt =
           ( typeCheckStmt
               ( LetAssignment
                   (Name "x")
+                  Nothing
                   (Lit (BooleanLiteral True))
               )
           )

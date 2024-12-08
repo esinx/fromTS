@@ -4,6 +4,7 @@ import Control.Monad (mapM_)
 import Data.Char qualified as Char
 import Data.Map (Map)
 import Data.Map qualified as Map
+import TSType
 import Test.HUnit
 import Test.QuickCheck (Arbitrary (..), Gen)
 import Test.QuickCheck qualified as QC
@@ -22,8 +23,8 @@ instance Monoid Block where
   mempty = Block []
 
 data Statement
-  = ConstAssignment Var Expression -- const x = e
-  | LetAssignment Var Expression -- let x = e
+  = ConstAssignment Var (Maybe TSType) Expression -- const x : type = e
+  | LetAssignment Var (Maybe TSType) Expression -- let x : type = e
   | If Expression Block Block -- if (e) { s1 } else { s2 }
   | For Expression Expression Expression Block -- for (e1; e2; e3) { s }
   | While Expression Block -- while (e) { s }
