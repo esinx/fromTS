@@ -17,6 +17,22 @@ main :: IO ()
 main = do
   -- typechecker
   runTestTT test_typeChecker
+  putStrLn "subtypeReflexive"
+  quickCheckN 100 prop_subtypeReflexive
+  putStrLn "properBottomTypeNever"
+  quickCheckN 100 prop_properBottomTypeNever
+  putStrLn "properTopTypeUnknown"
+  quickCheckN 100 prop_properTopTypeUnknown
+  putStrLn "chaoticTopTypeAny"
+  quickCheckN 100 prop_chaoticTopTypeAny
+  putStrLn "chaoticBottomTypeAny"
+  quickCheckN 100 prop_chaoticBottomTypeAny
+  putStrLn "asymmetricExceptAny"
+  quickCheckN 100 prop_asymmetricExceptAny
+  putStrLn "transitive"
+  quickCheckN 100 prop_transitive
+  putStrLn "func"
+  quickCheckN 100 prop_func
   putStrLn "differential"
   quickCheckN 100 prop_differential
 

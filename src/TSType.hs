@@ -5,9 +5,12 @@ import Control.Monad.Except (throwError)
 import Control.Monad.Reader
 import Control.Monad.State
 import Control.Monad.State qualified as S
+import Data.Char qualified as Char
 import Data.Map (Map)
 import Data.Map qualified as Map
 import TSError
+import Test.QuickCheck (Arbitrary (..), Gen)
+import Test.QuickCheck qualified as QC
 
 type TSGlobalEnv = Map String TSType
 
@@ -45,6 +48,71 @@ data TSType
   | TUnion [TSType]
   | TIntersection [TSType]
   deriving (Show, Eq)
+
+-- coupling: TSSyntax, to avoid circular dependencies
+
+-- | Generate a small set of names for generated tests. These names are guaranteed to not include
+-- reserved words
+genNameType :: Gen String
+genNameType = QC.elements ["x", "X", "y", "x0", "X0", "xy", "XY"]
+
+-- | Generate a string literal, being careful about the characters that it may contain
+genStringLitType :: Gen String
+genStringLitType = escape <$> QC.listOf (QC.elements stringLitChars)
+  where
+    -- escape special characters appearing in the string,
+    escape :: String -> String
+    escape = foldr Char.showLitChar ""
+    -- generate strings containing printable characters or spaces, but not including '\"'
+    stringLitChars :: [Char]
+    stringLitChars = filter (\c -> c /= '\"' && (Char.isSpace c || Char.isPrint c)) ['\NUL' .. '~']
+
+genMap :: Int -> Gen (Map String TSType)
+genMap 0 = return Map.empty
+genMap n = Map.fromList <$> QC.vectorOf 2 ((,) <$> genNameType <*> genType n)
+
+genType :: Int -> Gen TSType
+genType 0 =
+  QC.elements
+    [ TBoolean,
+      TNumber,
+      TString,
+      TBracket,
+      TObject,
+      TUnknown,
+      TAny,
+      TNever,
+      TVoid,
+      TNull,
+      TUndefined
+    ]
+genType n =
+  QC.frequency
+    [ (1, TBooleanLiteral <$> arbitrary),
+      (1, TNumberLiteral <$> arbitrary),
+      (1, TStringLiteral <$> genStringLitType),
+      (n, TArray <$> genType n'),
+      (n, TTuple <$> genType n' <*> genType n'),
+      (n, TEnum <$> genMap n'),
+      (n, TUserObject <$> genMap n'),
+      (n, TFunction <$> QC.vectorOf 2 (genType n') <*> genType n'),
+      (n, TUnion <$> QC.vectorOf 3 (genType n')),
+      (n, TIntersection <$> QC.vectorOf 3 (genType n'))
+    ]
+  where
+    n' = n `div` 2
+
+instance Arbitrary TSType where
+  arbitrary = QC.sized genType
+  shrink :: TSType -> [TSType]
+  shrink (TArray t) = TArray <$> shrink t
+  shrink (TTuple t u) = TTuple <$> shrink t <*> shrink u
+  shrink (TEnum m) = TEnum <$> shrink m
+  shrink (TUserObject m) = TUserObject <$> shrink m
+  shrink (TFunction ts t) = TFunction <$> shrink ts <*> shrink t
+  shrink (TUnion ts) = TUnion <$> shrink ts
+  shrink (TIntersection ts) = TIntersection <$> shrink ts
+  shrink _ = []
 
 type TSTypeChecker = ReaderT TSTypeEnv (Either Error)
 
