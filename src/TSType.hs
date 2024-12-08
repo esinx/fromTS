@@ -33,7 +33,7 @@ data TSType
   | TTuple TSType TSType -- [T, U]
   | TEnum (Map String TSType)
   | TBracket -- {}
-  | TObject
+  | TObject -- object
   | TUserObject (Map String TSType)
   | TFunction [TSType] TSType
   | TUnknown -- proper top

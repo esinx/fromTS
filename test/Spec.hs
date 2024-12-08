@@ -36,6 +36,36 @@ test_subtyping =
       [ isSubtype
           (TUnion [TBoolean, TNumber])
           (TUnion [TBoolean, TNumber, TUndefined])
+          ~?= True,
+        isSubtype
+          (TIntersection [TBoolean, TNumber])
+          TBoolean
+          ~?= True,
+        isSubtype TUndefined TVoid ~?= True,
+        isSubtype (TBooleanLiteral True) TBoolean ~?= True,
+        isSubtype (TStringLiteral "hi") TString ~?= True,
+        isSubtype (TNumberLiteral 4) TNumber ~?= True,
+        isSubtype TBoolean TBracket ~?= True,
+        isSubtype TBoolean TObject ~?= False,
+        isSubtype (TArray TNumber) TObject ~?= True,
+        isSubtype (TArray TNumber) TBracket
+          ~?= True,
+        isSubtype
+          (TTuple TNumber TBoolean)
+          ( TArray
+              (TUnion [TNumber, TBoolean])
+          )
+          ~?= True,
+        isSubtype
+          (TTuple TNumber TBoolean)
+          ( TArray
+              (TUnion [TNumber, TString])
+          )
+          ~?= False,
+        isSubtype TObject TBracket ~?= True,
+        isSubtype (TUserObject (Map.fromList [("x", TNumber)])) TObject
+          ~?= True,
+        isSubtype (TFunction [] TNumber) TObject
           ~?= True
       ]
 
@@ -67,12 +97,37 @@ test_typeCheckStmt =
 prop_subtypeReflexive :: TSType -> Bool
 prop_subtypeReflexive t = isSubtype t t
 
-prop_supertypeNever :: TSType -> Bool
-prop_supertypeNever = isSubtype TNever
+prop_properBottomTypeNever :: TSType -> Bool
+-- never is assignable to anything
+prop_properBottomTypeNever = isSubtype TNever
 
--- TODO: clarify the subtyping relations
-prop_subtypeVoid :: TSType -> Bool
-prop_subtypeVoid = isSubtype TVoid
+prop_properTopTypeUnknown :: TSType -> Bool
+-- Anything is assignable to unknown
+prop_properTopTypeUnknown t = isSubtype t TUnknown
+
+prop_chaoticTopTypeAny :: TSType -> Bool
+--- Anything is assignable to any
+prop_chaoticTopTypeAny t = isSubtype t TAny
+
+prop_chaoticBottomTypeAny :: TSType -> Bool
+-- any is assignable to anything (except never)
+prop_chaoticBottomTypeAny TNever = not $ isSubtype TAny TNever
+prop_chaoticBottomTypeAny t = isSubtype TAny t
+
+prop_asymmetricExceptAny :: TSType -> TSType -> Property
+prop_asymmetricExceptAny t1 t2 =
+  t1 /= TAny && t2 /= TAny ==>
+    isSubtype t1 t2 /= isSubtype t2 t1
+
+prop_transitive :: TSType -> TSType -> TSType -> Property
+prop_transitive t1 t2 t3 =
+  isSubtype t1 t2 && isSubtype t2 t3 ==>
+    isSubtype t1 t3
+
+prop_func :: TSType -> TSType -> TSType -> TSType -> Property
+prop_func s1 s2 t1 t2 =
+  isSubtype t1 s1 && isSubtype s2 t2 ==>
+    isSubtype (TFunction [s1] s2) (TFunction [t1] t2)
 
 prop_differential :: Block -> Property
 prop_differential = ioProperty . prop_ioDifferential
