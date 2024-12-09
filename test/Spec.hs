@@ -29,8 +29,8 @@ main = do
   quickCheckN 100 prop_chaoticBottomTypeAny
   putStrLn "asymmetricExceptAny"
   quickCheckN 100 prop_asymmetricExceptAny
-  putStrLn "transitive"
-  quickCheckN 100 prop_transitive
+  putStrLn "transitiveExceptAny"
+  quickCheckN 100 prop_transitiveExceptAny
   putStrLn "func"
   quickCheckN 100 prop_func
   putStrLn "differential"
@@ -82,6 +82,14 @@ test_subtyping =
         isSubtype (TUserObject (Map.fromList [("x", TNumber)])) TObject
           ~?= True,
         isSubtype (TFunction [] TNumber) TObject
+          ~?= True,
+        isSubtype (TFunction [TAny] TNever) (TFunction [TNull] TUnknown)
+          ~?= True,
+        isSubtype TAny (TIntersection [TIntersection [TNever]])
+          ~?= False,
+        isSubtype (TUnion [TBracket, TNull, TUndefined]) TUnknown
+          ~?= True,
+        isSubtype (TUnion [TNull, TBracket, TUndefined]) TUnknown
           ~?= True
       ]
 
@@ -127,18 +135,22 @@ prop_chaoticTopTypeAny t = isSubtype t TAny
 
 prop_chaoticBottomTypeAny :: TSType -> Bool
 -- any is assignable to anything (except never)
-prop_chaoticBottomTypeAny TNever = not $ isSubtype TAny TNever
+prop_chaoticBottomTypeAny t | simplify t == TNever = not $ isSubtype TAny TNever
 prop_chaoticBottomTypeAny t = isSubtype TAny t
 
 prop_asymmetricExceptAny :: TSType -> TSType -> Property
 prop_asymmetricExceptAny t1 t2 =
-  t1 /= TAny && t2 /= TAny ==>
-    isSubtype t1 t2 /= isSubtype t2 t1
+  simplify t1 /= TAny && simplify t2 /= TAny && simplify t1 /= simplify t2 ==>
+    (not (isSubtype t1 t2) || not (isSubtype t2 t1))
 
-prop_transitive :: TSType -> TSType -> TSType -> Property
-prop_transitive t1 t2 t3 =
-  isSubtype t1 t2 && isSubtype t2 t3 ==>
-    isSubtype t1 t3
+prop_transitiveExceptAny :: TSType -> TSType -> TSType -> Property
+prop_transitiveExceptAny t1 t2 t3 =
+  isSubtype t1 t2
+    && isSubtype t2 t3
+    && simplify t1 /= TAny
+    && simplify t2 /= TAny
+    && simplify t3 /= TAny
+    ==> isSubtype t1 t3
 
 prop_func :: TSType -> TSType -> TSType -> TSType -> Property
 prop_func s1 s2 t1 t2 =

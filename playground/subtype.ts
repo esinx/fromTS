@@ -24,19 +24,63 @@ const array: (number | string)[] = tuple;
 
 const x = { a: 1, b: "hi" };
 const y: object = x;
+const y2: { a: number } = x; // Ok
+const y3: {} = x; // Ok
+const y4: { c: 2 } = x; // Error
 
 const z: { a: number } = x;
 const z2: { a: number, b: string, c: number } = x; // Error
 
-const func1 = (x: number): number | string => x;
-const func2 = (x: number | string): number => 1;
+const arr_to_object: { a: number } = [1]; // Error
+
+const func1 = (x: number, y: string, z: undefined): number | string => x;
+const func2 = (x: number, y2: number | string): number => 1;
 
 type test = typeof func2 extends typeof func1 ? 1 : 2; // 1
 
 declare const union: boolean | number;
-const union2: boolean | number | undefined = union; // Error
+const union2: boolean | number | undefined = union; // Ok
+
+enum Role {
+    Admin = "ADMIN",
+    User = "USER",
+    Guest = "GUEST"
+}
+
+enum Role2 {
+    Admin = "ADMIN",
+    User = "USER",
+}
+
+enum Role3 {
+    Admin = "ADMIN",
+    User = "USER",
+    Guest = "GUEST"
+}
+
+const role: Role = Role2; // Error
+const role2: Role = Role3; // Error
 
 
+const person = {
+    name: "John",
+    age: 30
+}
+
+const person2: {
+    name: string
+} = person; // Ok
+
+
+
+const str: string = Role.Admin; // Ok
+
+const q: unknown = Role;
+
+const assign: {} | null | undefined = unknown; // Ok
+
+const check1: number = union; // Error
+const check2: unknown = union; // Ok
 
 
 

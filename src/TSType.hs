@@ -34,7 +34,6 @@ data TSType
   | TStringLiteral String -- "hello"
   | TArray TSType -- Array<T>
   | TTuple TSType TSType -- [T, U]
-  | TEnum (Map String TSType)
   | TBracket -- {}
   | TObject -- object
   | TUserObject (Map String TSType)
@@ -47,7 +46,7 @@ data TSType
   | TUndefined
   | TUnion [TSType]
   | TIntersection [TSType]
-  deriving (Show, Eq)
+  deriving (Show, Eq, Ord)
 
 -- coupling: TSSyntax, to avoid circular dependencies
 
@@ -93,7 +92,6 @@ genType n =
       (1, TStringLiteral <$> genStringLitType),
       (n, TArray <$> genType n'),
       (n, TTuple <$> genType n' <*> genType n'),
-      (n, TEnum <$> genMap n'),
       (n, TUserObject <$> genMap n'),
       (n, TFunction <$> QC.vectorOf 2 (genType n') <*> genType n'),
       (n, TUnion <$> QC.vectorOf 3 (genType n')),
@@ -107,7 +105,6 @@ instance Arbitrary TSType where
   shrink :: TSType -> [TSType]
   shrink (TArray t) = TArray <$> shrink t
   shrink (TTuple t u) = TTuple <$> shrink t <*> shrink u
-  shrink (TEnum m) = TEnum <$> shrink m
   shrink (TUserObject m) = TUserObject <$> shrink m
   shrink (TFunction ts t) = TFunction <$> shrink ts <*> shrink t
   shrink (TUnion ts) = TUnion <$> shrink ts
