@@ -444,13 +444,13 @@ test_stat :: Test
 test_stat =
   "parsing statements"
     ~: TestList
-      [ P.parse statementP "" "const x = 3" ~?= Right (ConstAssignment (Name "x") Nothing (Lit (IntegerLiteral 3))),
+      [ P.parse statementP "" "const x = 3" ~?= Right (ConstAssignment (Name "x") (Lit (IntegerLiteral 3))),
         P.parse statementP "" "if (x) { let y = undefined } else { const y = null }"
           ~?= Right
             ( If
                 (Var (Name "x"))
-                (Block [LetAssignment (Name "y") Nothing (Lit UndefinedLiteral)])
-                (Block [ConstAssignment (Name "y") Nothing (Lit NullLiteral)])
+                (Block [LetAssignment (Name "y") (Lit UndefinedLiteral)])
+                (Block [ConstAssignment (Name "y") (Lit NullLiteral)])
             )
             -- P.parse statementP "" "while (null) { x += 1 }"
             --   ~?= Right
