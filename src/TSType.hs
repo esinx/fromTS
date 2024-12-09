@@ -12,15 +12,12 @@ import TSError
 import Test.QuickCheck (Arbitrary (..), Gen)
 import Test.QuickCheck qualified as QC
 
-type TSGlobalEnv = Map String TSType
-
-type TSLocalEnv = Map String TSType
+type TSVarEnv = [Map String TSType]
 
 type TSObjectEnv = Map String TSType
 
 data TSTypeEnv = TSTypeEnv
-  { globalEnv :: TSGlobalEnv,
-    localEnv :: TSLocalEnv,
+  { varEnvs :: TSVarEnv,
     objectEnv :: TSObjectEnv
   }
   deriving (Show, Eq)
@@ -116,20 +113,24 @@ type TSTypeChecker = ReaderT TSTypeEnv (Either Error)
 initialTSTypeEnv :: TSTypeEnv
 initialTSTypeEnv =
   TSTypeEnv
-    { globalEnv = Map.empty,
-      localEnv = Map.empty,
+    { varEnvs = [Map.empty],
       objectEnv = Map.empty
     }
 
-updateGlobalEnv :: String -> TSType -> TSTypeChecker ()
-updateGlobalEnv name t = do
+updateVarEnv :: String -> TSType -> TSTypeChecker ()
+updateVarEnv name t = do
   env <- ask
-  local (\env -> env {objectEnv = Map.insert name t (globalEnv env)}) (return ())
+  case varEnvs env of
+    [] -> local (const initialTSTypeEnv) (return ())
+    currEnv : envs ->
+      if Map.member name currEnv
+        then throwError $ TypeError $ "Variable " ++ name ++ " not found in the environment"
+        else local (\env -> env {varEnvs = Map.insert name t currEnv : envs}) (return ())
 
-updateLocalEnv :: String -> TSType -> TSTypeChecker ()
-updateLocalEnv name t = do
+createNewVarEnv :: TSTypeChecker ()
+createNewVarEnv = do
   env <- ask
-  local (\env -> env {objectEnv = Map.insert name t (localEnv env)}) (return ())
+  local (\env -> env {varEnvs = Map.empty : varEnvs env}) (return ())
 
 updateObjectEnv :: String -> TSType -> TSTypeChecker ()
 updateObjectEnv name t = do
@@ -139,7 +140,7 @@ updateObjectEnv name t = do
 lookupVarType :: String -> TSTypeChecker TSType
 lookupVarType name = do
   env <- ask
-  case Map.lookup name (localEnv env) <|> Map.lookup name (globalEnv env) of
+  case foldr (\m acc -> Map.lookup name m <|> acc) Nothing (varEnvs env) of -- TODO: check if this impl shadows correctly
     Just t -> return t
     Nothing -> throwError $ TypeError $ "Variable " ++ name ++ " not found in the environment"
 

@@ -138,9 +138,10 @@ typeCheckVar (Name n) = lookupVarType n
 typeCheckVar (Dot exp n) = do
   t <- typeCheckExpr' False exp
   case t of
-    TUserObject m -> case Map.lookup n m of
-      Just t -> return t
-      Nothing -> throwError $ TypeError $ "field " ++ n ++ " not found in object"
+    TUserObject m ->
+      case Map.lookup n m of
+        Just t -> return t
+        Nothing -> throwError $ TypeError $ "field " ++ n ++ " not found in object"
     TObject -> throwError $ TypeError $ "field " ++ n ++ " not found in object"
     _ -> throwError $ TypeError "expected object type"
 typeCheckVar (Element arrExp indexExp) = do
@@ -150,15 +151,52 @@ typeCheckVar (Element arrExp indexExp) = do
     TArray t ->
       if isSubtype index TNumber
         then return t
-        else return TAny
+        else return TAny -- TODO: check, not sure, gives error sometimes
     TTuple t u ->
       case index of
         TNumberLiteral 0 -> return t
         TNumberLiteral 1 -> return u
         TNumberLiteral _ -> throwError $ TypeError "no element at index >=2 in tuple"
         t | isSubtype t TNumber -> return (TUnion [t, u])
-        _ -> return TAny
-    _ -> return TAny
+        _ -> return TAny -- TODO: check, not sure, gives error sometimes
+    _ -> return TAny -- TODO: check, not sure, gives error sometimes
+
+typeCheckUnaryOpPrefix :: UopPrefix -> TSType -> TSTypeChecker TSType
+typeCheckUnaryOpPrefix Not _ = return TBoolean
+typeCheckUnaryOpPrefix BitNeg t
+  | isSubtype t TNumber = return TNumber
+  | otherwise = throwError $ TypeError "expected number type"
+typeCheckUnaryOpPrefix TypeOf _ = return TString
+typeCheckUnaryOpPrefix Spread t = return $ TArray t
+typeCheckUnaryOpPrefix DecPre t
+  | isSubtype t TNumber = return TNumber
+  | otherwise = throwError $ TypeError "expected number type"
+typeCheckUnaryOpPrefix IncPre t
+  | isSubtype t TNumber = return TNumber
+  | otherwise = throwError $ TypeError "expected number type"
+typeCheckUnaryOpPrefix PlusUop t
+  | isSubtype t TNumber = return TNumber -- TODO: check behavior, it seems like +"a" is still of number type (no error)
+  | otherwise = throwError $ TypeError "expected number type"
+typeCheckUnaryOpPrefix MinusUop t
+  | isSubtype t TNumber = return TNumber
+  | otherwise = throwError $ TypeError "expected number type"
+typeCheckUnaryOpPrefix Void _ = return TUndefined
+
+typeCheckUnaryOpPostfix :: UopPostfix -> TSType -> TSTypeChecker TSType
+typeCheckUnaryOpPostfix DecPost t
+  | isSubtype t TNumber = return TNumber
+  | otherwise = throwError $ TypeError "expected number type"
+typeCheckUnaryOpPostfix IncPost t
+  | isSubtype t TNumber = return TNumber
+  | otherwise = throwError $ TypeError "expected number type"
+
+typeCheckBinaryOp :: TSType -> Bop -> TSType -> TSTypeChecker TSType
+typeCheckBinaryOp t1 Assign t2
+  | isSubtype t2 t1 = do
+      _ <- updateVarEnv "x" t1
+      return t2
+  | otherwise = throwError $ TypeError "type mismatch"
+typeCheckBinaryOp _ _ _ = undefined
 
 -- | typechecks an expression, first argument indicate if we want to get the literal type
 typeCheckExpr' :: Bool -> Expression -> TSTypeChecker TSType
@@ -168,6 +206,12 @@ typeCheckExpr' _ (Var v) = typeCheckVar v
 typeCheckExpr' _ (AnnotatedExpression t e) = do
   e' <- typeCheckExpr e
   if isSubtype e' t then return t else throwError $ TypeError "type mismatch"
+typeCheckExpr' _ (UnaryOpPrefix op e) = do
+  t <- typeCheckExpr e
+  typeCheckUnaryOpPrefix op t
+typeCheckExpr' _ (UnaryOpPostfix e op) = do
+  t <- typeCheckExpr e
+  typeCheckUnaryOpPostfix op t
 typeCheckExpr' _ _ = undefined
 
 -- | typechecks an expression
@@ -189,6 +233,13 @@ typeCheckBlock (Block (s : ss)) = do
 -- and empty variable bindings
 typeCheckProgram ::
   Block ->
-  Either Error TSGlobalEnv
+  Either Error (Map.Map String TSType)
 typeCheckProgram b = do
-  runReaderT (typeCheckBlock b >> asks globalEnv) initialTSTypeEnv
+  runReaderT (typeCheckBlock b >> extractTopEnv) initialTSTypeEnv
+  where
+    extractTopEnv = do
+      r <- ask
+      let x = varEnvs r
+      case x of
+        [] -> return Map.empty
+        (env : _) -> return env

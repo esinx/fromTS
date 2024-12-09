@@ -136,4 +136,6 @@ const tupleIndex = tupleee[1]; // string
 const tupleIndex2 = 1["hi"]; // number | string
 
 let arrOut = [1, 2, 3];
-arrOut["hi"] = 4; // Ok
+arrOut["hi"] = 4; // Ok???
+
+let check = -arrOut

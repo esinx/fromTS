@@ -34,6 +34,7 @@ data Statement
   | Return Expression
   | Switch Expression [(Expression, Block)] -- switch (e) { case e1: s1; ... }
   | LabeledStatement String Statement -- label: s
+  | FunctionDeclaration Expression -- I was thinking of using this as a wrapper of FunctionExpression?
   | FunctionCall Expression -- f(e1, ..., en)
   | Empty -- ';'
   deriving (Eq, Show)
