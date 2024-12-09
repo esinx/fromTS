@@ -103,7 +103,7 @@ test_typeCheckExpr =
     ~: TestList
       [ runReaderT (typeCheckExpr (Lit (BooleanLiteral True))) initialTSTypeEnv
           ~?= Right (TBooleanLiteral True),
-        runReaderT (typeCheckExpr (Var (Name "x"))) initialTSTypeEnv {localEnv = Map.singleton "x" TNumber}
+        runReaderT (typeCheckExpr (Var (Name "x"))) initialTSTypeEnv {varEnvs = [Map.singleton "x" TNumber]}
           ~?= Right TNumber
       ]
 
