@@ -44,7 +44,23 @@ data TSType
   | TUndefined
   | TUnion [TSType]
   | TIntersection [TSType]
-  deriving (Show, Eq)
+
+instance Show TSType where
+  show :: TSType -> String
+  show TBoolean = "boolean"
+  show (TBooleanLiteral True) = "true"
+  show (TBooleanLiteral False) = "false"
+  show TNumber = "number"
+  show (TNumberLiteral v) = show v
+  show TString = "string"
+  show (TStringLiteral v) = "\"" ++ v ++ "\""
+  show (TArray t) = show t ++ "[]"
+  -- show (TUnion types) = Data.
+  show _ = "any"
+
+instance Eq TSType where
+  (==) :: TSType -> TSType -> Bool
+  (==) ta tb = undefined
 
 type TSTypeChecker = ReaderT TSTypeEnv (Either Error)
 

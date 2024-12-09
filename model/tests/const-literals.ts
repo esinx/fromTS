@@ -2,7 +2,6 @@ const num = 42
 const str = "literal-string"
 const boolTrue = true
 const boolFalse = false
-const constObj = { key: "value" } as const
 const obj = { key: "value" }
 const arrOfNum = [1, 2, 3]
 const arrOfStr = ["a", "b", "c"]
