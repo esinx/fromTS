@@ -19,6 +19,7 @@ simplify (TUnion ts) | List.sort ts == List.sort [TBracket, TNull, TUndefined] =
 simplify (TUnion [t]) = t
 simplify (TUnion ts) = TUnion $ List.sort $ List.nub $ map simplify ts
 simplify (TIntersection [t]) = t
+simplify (TIntersection ts) | TNever `elem` ts = TNever
 simplify (TIntersection ts) = TIntersection $ List.sort $ List.nub $ map simplify ts
 -- TODO: there might be other types that are equivalent to some union types
 simplify t = t
@@ -151,15 +152,15 @@ typeCheckVar (Element arrExp indexExp) = do
     TArray t ->
       if isSubtype index TNumber
         then return t
-        else return TAny -- TODO: check, not sure, gives error sometimes
+        else return TAny -- allowing implicit any
     TTuple t u ->
       case index of
         TNumberLiteral 0 -> return t
         TNumberLiteral 1 -> return u
         TNumberLiteral _ -> throwError $ TypeError "no element at index >=2 in tuple"
         t | isSubtype t TNumber -> return (TUnion [t, u])
-        _ -> return TAny -- TODO: check, not sure, gives error sometimes
-    _ -> return TAny -- TODO: check, not sure, gives error sometimes
+        _ -> return TAny
+    _ -> return TAny
 
 typeCheckUnaryOpPrefix :: UopPrefix -> TSType -> TSTypeChecker TSType
 typeCheckUnaryOpPrefix Not _ = return TBoolean
@@ -190,12 +191,27 @@ typeCheckUnaryOpPostfix IncPost t
   | isSubtype t TNumber = return TNumber
   | otherwise = throwError $ TypeError "expected number type"
 
-typeCheckBinaryOp :: TSType -> Bop -> TSType -> TSTypeChecker TSType
-typeCheckBinaryOp t1 Assign t2
-  | isSubtype t2 t1 = do
-      _ <- updateVarEnv "x" t1
-      return t2
-  | otherwise = throwError $ TypeError "type mismatch"
+typeCheckBinaryOp :: Expression -> Bop -> Expression -> TSTypeChecker TSType
+-- t1 = t2
+typeCheckBinaryOp (Var v) Assign e = do
+  t1 <- typeCheckVar v
+  t2 <- typeCheckExpr e
+  if isSubtype t2 t1 then return t2 else throwError $ TypeError "type mismatch"
+-- t1 == t2
+typeCheckBinaryOp e1 Eq e2 = do
+  t1 <- typeCheckExpr e1
+  t2 <- typeCheckExpr e2
+  -- TODO: there are some cases (e.g. 1 == {}) where 1 is technically a subtype
+  -- of {}, but we should throw error in this case. however, it seems like
+  -- we are not going to parse {} as type {}/ Object but instead as object literal.
+  -- there are also cases like:
+  --          const x = 1;
+  --          const y = {};
+  --          x == y; // does not error
+  -- where if we parse {} as object literal instead of type {}, then it will error...
+  if isSubtype t1 t2 || isSubtype t2 t1
+    then return TBoolean
+    else throwError $ TypeError "type mismatch"
 typeCheckBinaryOp _ _ _ = undefined
 
 -- | typechecks an expression, first argument indicate if we want to get the literal type
@@ -212,6 +228,11 @@ typeCheckExpr' _ (UnaryOpPrefix op e) = do
 typeCheckExpr' _ (UnaryOpPostfix e op) = do
   t <- typeCheckExpr e
   typeCheckUnaryOpPostfix op t
+typeCheckExpr' _ (BinaryOp e1 op e2) = typeCheckBinaryOp e1 op e2
+typeCheckExpr' _ (Array es) = do
+  ts <- traverse (typeCheckExpr' False) es
+  return $ TArray $ simplify (TUnion ts)
+-- TODO: functions
 typeCheckExpr' _ _ = undefined
 
 -- | typechecks an expression
@@ -220,7 +241,13 @@ typeCheckExpr = typeCheckExpr' True
 
 -- | typechecks a statement
 typeCheckStmt :: Statement -> TSTypeChecker ()
-typeCheckStmt = undefined
+typeCheckStmt (ConstAssignment (Name n) e) = do
+  t <- typeCheckExpr e
+  putVarEnv n t
+typeCheckStmt (LetAssignment (Name n) e) = do
+  t <- typeCheckExpr' False e
+  putVarEnv n t
+typeCheckStmt _ = undefined
 
 -- | typechecks a block
 typeCheckBlock :: Block -> TSTypeChecker ()
@@ -241,5 +268,5 @@ typeCheckProgram b = do
       r <- ask
       let x = varEnvs r
       case x of
-        [] -> return Map.empty
+        [] -> error "empty env" -- TODO: returning empty instead of throwing error, but this should never happen
         (env : _) -> return env

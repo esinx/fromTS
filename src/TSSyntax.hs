@@ -35,6 +35,11 @@ data Statement
   | Switch Expression [(Expression, Block)] -- switch (e) { case e1: s1; ... }
   | LabeledStatement String Statement -- label: s
   | FunctionDeclaration Expression -- I was thinking of using this as a wrapper of FunctionExpression?
+  -- I think we need some way to parse stuff like this (type annotations and optional parameters + unwrapping):
+  -- type Obj = {
+  --   x: number,
+  --   y?: number
+  -- };
   | FunctionCall Expression -- f(e1, ..., en)
   | Empty -- ';'
   deriving (Eq, Show)
@@ -46,6 +51,7 @@ data Expression
   | UnaryOpPrefix UopPrefix Expression -- unary operators
   | UnaryOpPostfix Expression UopPostfix -- unary operators
   | BinaryOp Expression Bop Expression -- binary operators
+  -- I am kind of confused about the [Expression], shouldn't it be statements?
   | FunctionExpression (Maybe String) [Expression] Block -- function (x, y) { s } and (x, y) => s
   | Array [Expression] -- [e1, ..., en]
   deriving (Eq, Show)

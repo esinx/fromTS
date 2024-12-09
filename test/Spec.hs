@@ -42,7 +42,8 @@ test_typeChecker =
   TestList
     [ test_subtyping,
       test_typeCheckExpr,
-      test_typeCheckStmt
+      test_typeCheckStmt,
+      test_typeCheckProg
     ]
 
 test_subtyping :: Test
@@ -120,6 +121,20 @@ test_typeCheckStmt =
           )
           initialTSTypeEnv
           ~?= Right ()
+      ]
+
+test_typeCheckProg :: Test
+test_typeCheckProg =
+  "program type checking tests"
+    ~: TestList
+      [ typeCheckProgram
+          ( Block
+              [ LetAssignment
+                  (Name "x")
+                  (Lit (BooleanLiteral True))
+              ]
+          )
+          ~?= Right (Map.singleton "x" TBoolean)
       ]
 
 -- properties for the typechecker

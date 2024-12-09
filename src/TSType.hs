@@ -117,20 +117,42 @@ initialTSTypeEnv =
       objectEnv = Map.empty
     }
 
+putVarEnv :: String -> TSType -> TSTypeChecker ()
+putVarEnv name t = do
+  env <- ask
+  case varEnvs env of
+    [] -> error "empty env" -- TODO: returning empty instead of throwing error, but this should never happen
+    currEnv : envs ->
+      if Map.member name currEnv
+        then throwError $ TypeError $ "Repeated declaration of: " ++ name
+        else local (\env -> env {varEnvs = Map.insert name t currEnv : envs}) (return ())
+
 updateVarEnv :: String -> TSType -> TSTypeChecker ()
 updateVarEnv name t = do
   env <- ask
-  case varEnvs env of
-    [] -> local (const initialTSTypeEnv) (return ())
-    currEnv : envs ->
-      if Map.member name currEnv
-        then throwError $ TypeError $ "Variable " ++ name ++ " not found in the environment"
-        else local (\env -> env {varEnvs = Map.insert name t currEnv : envs}) (return ())
+  let update [] = throwError $ TypeError $ "Variable " ++ name ++ " not found in the environment"
+      update (currEnv : envs) =
+        if Map.member name currEnv
+          then
+            local (\env -> env {varEnvs = Map.insert name t currEnv : envs}) (return ())
+          else do
+            update envs
+            e <- ask
+            let envs' = varEnvs e
+            local (\env -> env {varEnvs = currEnv : envs'}) (return ())
+  update (varEnvs env)
 
 createNewVarEnv :: TSTypeChecker ()
 createNewVarEnv = do
   env <- ask
   local (\env -> env {varEnvs = Map.empty : varEnvs env}) (return ())
+
+dropVarEnv :: TSTypeChecker ()
+dropVarEnv = do
+  env <- ask
+  case varEnvs env of
+    [] -> error "empty env" -- TODO: returning empty instead of throwing error, but this should never happen
+    _ : envs -> local (\env -> env {varEnvs = envs}) (return ())
 
 updateObjectEnv :: String -> TSType -> TSTypeChecker ()
 updateObjectEnv name t = do

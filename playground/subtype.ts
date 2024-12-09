@@ -124,6 +124,9 @@ const objectIndex = {}.name;
 const n2 = userObj.bad;
 
 const arr = [1, "hi", 3];
+const arrIndex = arr["hi"]; // any
+
+
 
 const nonObj = arr.hi;
 
@@ -139,3 +142,49 @@ let arrOut = [1, 2, 3];
 arrOut["hi"] = 4; // Ok???
 
 let check = -arrOut
+
+var something: string | number = 1
+
+function testFunc() {
+    return something = "hi";
+}
+
+1 == { a: 1 } // Error
+1 == 1 + 1
+
+{ a: 1 } == { a: 1 } // Error TODO: why
+
+const obj1 = { a: 1 };
+const obj2 = { a: 1 };
+const obj3 = { a: 1, b: 2 };
+obj1 == obj2
+obj2 == obj3
+
+const whattt: {} = {};
+whattt == {}
+
+const whatttttt = 1
+whatttttt == {}
+
+1 == {}
+
+whatttttt == whattt
+
+const wut = undefined;
+const wut2 = null;
+
+wut == wut2
+
+1 == [1; 2; 3]
+
+1 == "hi"
+
+1 == 1
+
+const objecttt = {}
+
+const objectttt: object = objecttt
+
+const varrrr = 1
+const varrrrr = [1, 2, 3]
+varrrr == varrrrr
