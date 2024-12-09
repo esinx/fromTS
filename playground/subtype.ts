@@ -71,8 +71,6 @@ const person2: {
     name: string
 } = person; // Ok
 
-
-
 const str: string = Role.Admin; // Ok
 
 const q: unknown = Role;
@@ -83,5 +81,7 @@ const check1: number = union; // Error
 const check2: unknown = union; // Ok
 
 
+// rough work
 
-
+const arr2 = [1, "hi", 3];
+const index1 = arr2[1]; // number | string

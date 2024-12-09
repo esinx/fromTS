@@ -101,9 +101,9 @@ test_typeCheckExpr :: Test
 test_typeCheckExpr =
   "expression type checking tests"
     ~: TestList
-      [ runReaderT (typeCheckExpr (Lit (BooleanLiteral True))) initialTSTypeEnv
+      [ runReaderT (typeCheckExpr False (Lit (BooleanLiteral True))) initialTSTypeEnv
           ~?= Right TBoolean,
-        runReaderT (typeCheckExpr (Var (Name "x"))) initialTSTypeEnv {localEnv = Map.singleton "x" TNumber}
+        runReaderT (typeCheckExpr False (Var (Name "x"))) initialTSTypeEnv {localEnv = Map.singleton "x" TNumber}
           ~?= Right TNumber
       ]
 

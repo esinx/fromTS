@@ -1,5 +1,6 @@
 module TSTypeChecker where
 
+import Control.Monad.Except (throwError)
 import Control.Monad.Reader
 import Control.Monad.Reader qualified as S
 import Control.Monad.State
@@ -109,11 +110,39 @@ isSubtype t TBracket
   | otherwise = True
 isSubtype _ _ = False
 
--- | typechecks an expression
-typeCheckExpr :: Expression -> TSTypeChecker TSType
-typeCheckExpr (Lit (BooleanLiteral _)) = return TBoolean
-typeCheckExpr (Var (Name n)) = lookupVarType n
-typeCheckExpr _ = undefined
+typeCheckLiteral :: Literal -> TSTypeChecker TSType
+typeCheckLiteral (IntegerLiteral _) = return TNumber
+typeCheckLiteral (StringLiteral _) = return TString
+typeCheckLiteral (BooleanLiteral _) = return TBoolean
+typeCheckLiteral NullLiteral = return TNull
+typeCheckLiteral UndefinedLiteral = return TUndefined
+
+typeCheckConstLiteral :: Literal -> TSTypeChecker TSType
+typeCheckConstLiteral (IntegerLiteral n) = return $ TNumberLiteral n
+typeCheckConstLiteral (StringLiteral s) = return $ TStringLiteral s
+typeCheckConstLiteral (BooleanLiteral b) = return $ TBooleanLiteral b
+typeCheckConstLiteral NullLiteral = return TNull
+typeCheckConstLiteral UndefinedLiteral = return TUndefined
+
+-- | typechecks an expression, first argument indicate if we want to get the literal type
+typeCheckExpr :: Bool -> Expression -> TSTypeChecker TSType
+typeCheckExpr isConst (Lit l) = if isConst then typeCheckConstLiteral l else typeCheckLiteral l
+typeCheckExpr _ (Var (Name n)) = lookupVarType n
+typeCheckExpr _ (Var (Dot exp n)) = do
+  t <- typeCheckExpr False exp
+  case t of
+    TUserObject m -> case Map.lookup n m of
+      Just t -> return t
+      Nothing -> throwError $ TypeError $ "field " ++ n ++ " not found in object"
+    TObject -> throwError $ TypeError $ "field " ++ n ++ " not found in object"
+    _ -> throwError $ TypeError "expected object type"
+typeCheckExpr _ (Var (Element exp1 exp2)) = do
+  t1 <- typeCheckExpr False exp1
+  t2 <- typeCheckExpr False exp2
+  case t1 of
+    TArray t -> if isSubtype t2 TNumber then return t else throwError $ TypeError "expected number type"
+    _ -> throwError $ TypeError "expected array type"
+typeCheckExpr _ _ = undefined
 
 -- | typechecks a statement
 typeCheckStmt :: Statement -> TSTypeChecker ()

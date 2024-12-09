@@ -29,7 +29,7 @@ data TSType
   = TBoolean -- boolean
   | TBooleanLiteral Bool -- true, false
   | TNumber -- number
-  | TNumberLiteral Double -- 1, 2.3
+  | TNumberLiteral Int -- 1
   | TString -- string
   | TStringLiteral String -- "hello"
   | TArray TSType -- Array<T>
@@ -39,7 +39,7 @@ data TSType
   | TUserObject (Map String TSType)
   | TFunction [TSType] TSType
   | TUnknown -- proper top
-  | TAny -- chaotic top type
+  | TAny -- chaotic top/ bottom type
   | TNever -- bottom type
   | TVoid
   | TNull
