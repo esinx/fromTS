@@ -46,6 +46,7 @@ data Expression
   | UnaryOpPostfix Expression UopPostfix -- unary operators
   | BinaryOp Expression Bop Expression -- binary operators
   | FunctionExpression (Maybe String) [Expression] Block -- function (x, y) { s } and (x, y) => s
+  | Array [Expression] -- [e1, ..., en]
   deriving (Eq, Show)
 
 data Literal

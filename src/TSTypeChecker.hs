@@ -23,54 +23,57 @@ simplify (TIntersection ts) = TIntersection $ List.sort $ List.nub $ map simplif
 -- TODO: there might be other types that are equivalent to some union types
 simplify t = t
 
--- | checks if a type is a subtype of another type
 isSubtype :: TSType -> TSType -> Bool
+isSubtype t1 t2 = isSubtype' (simplify t1) (simplify t2)
+
+-- | checks if a type is a subtype of another type
+isSubtype' :: TSType -> TSType -> Bool
 -- reflexivity
-isSubtype t1 t2 | simplify t1 == simplify t2 = True
+isSubtype' t1 t2 | t1 == t2 = True
 -- union
-isSubtype (TUnion ts) t = all (`isSubtype` t) ts
-isSubtype t (TUnion ts) = any (isSubtype t) ts
+isSubtype' (TUnion ts) t = all (`isSubtype'` t) ts
+isSubtype' t (TUnion ts) = any (isSubtype' t) ts
 -- intersection
-isSubtype (TIntersection ts) t = any (`isSubtype` t) ts
-isSubtype t (TIntersection ts) = all (isSubtype t) ts
+isSubtype' (TIntersection ts) t = any (`isSubtype'` t) ts
+isSubtype' t (TIntersection ts) = all (isSubtype' t) ts
 -- proper bottom type
-isSubtype TNever _ = True
+isSubtype' TNever _ = True
 -- proper top type
-isSubtype _ TUnknown = True
+isSubtype' _ TUnknown = True
 -- chaotic top/ bottom type
-isSubtype _ TAny = True
-isSubtype TAny TNever = False
-isSubtype TAny _ = True
+isSubtype' _ TAny = True
+isSubtype' TAny TNever = False
+isSubtype' TAny _ = True
 -- nothing is a subtype of null except bottom types
-isSubtype _ TNull = False
+isSubtype' _ TNull = False
 -- nothing is a subtype of undefined except bottom types
-isSubtype _ TUndefined = False
+isSubtype' _ TUndefined = False
 -- nothing is a subtype of void except bottom types and undefined
-isSubtype TUndefined TVoid = True
-isSubtype _ TVoid = False
+isSubtype' TUndefined TVoid = True
+isSubtype' _ TVoid = False
 -- nothing is a subtype of literal types except bottom types
-isSubtype _ (TStringLiteral _) = False
-isSubtype _ (TNumberLiteral _) = False
-isSubtype _ (TBooleanLiteral _) = False
+isSubtype' _ (TStringLiteral _) = False
+isSubtype' _ (TNumberLiteral _) = False
+isSubtype' _ (TBooleanLiteral _) = False
 -- T1 <: S1       S2 <: T2
 -- ----------------------
 --    S1 → S2 <: T1 → T2
-isSubtype (TFunction args1 ret1) (TFunction args2 ret2) =
+isSubtype' (TFunction args1 ret1) (TFunction args2 ret2) =
   length args1 <= length args2 -- contravariant
-    && all (uncurry isSubtype) (zip args2 args1)
-    && isSubtype ret1 ret2
+    && all (uncurry isSubtype') (zip args2 args1)
+    && isSubtype' ret1 ret2
 -- nothing is a subtype of functions except bottom types
-isSubtype _ (TFunction _ _) = False
+isSubtype' _ (TFunction _ _) = False
 -- S1 <: T1       S2 <: T2
 -- ------------------------
 --    S1 * S2 <: T1 * T2
-isSubtype (TTuple t1 t2) (TTuple u1 u2) = isSubtype t1 u1 && isSubtype t2 u2
+isSubtype' (TTuple t1 t2) (TTuple u1 u2) = isSubtype' t1 u1 && isSubtype' t2 u2
 -- nothing is a subtype of tuples except bottom types
-isSubtype _ (TTuple _ _) = False
+isSubtype' _ (TTuple _ _) = False
 -- nothing is a subtype of arrays except bottom types and tuples
-isSubtype (TArray t1) (TArray t2) = isSubtype t1 t2
-isSubtype (TTuple t1 t2) (TArray arrType) = isSubtype (TUnion [t1, t2]) arrType
-isSubtype _ (TArray _) = False
+isSubtype' (TArray t1) (TArray t2) = isSubtype' t1 t2
+isSubtype' (TTuple t1 t2) (TArray arrType) = isSubtype' (TUnion [t1, t2]) arrType
+isSubtype' _ (TArray _) = False
 --              n > m
 -- ---------------------------------- (Width Subtyping)
 -- {i1:T1...in:Tn} <: {i1:T1...im:Tm}
@@ -78,37 +81,37 @@ isSubtype _ (TArray _) = False
 -- ---------------------------------- (Depth Subtyping)
 -- {i1:S1...in:Sn} <: {i1:T1...in:Tn}
 -- object 1's fields is a permutation of fields in object 2
-isSubtype (TUserObject n) (TUserObject m) =
+isSubtype' (TUserObject n) (TUserObject m) =
   length n >= length m
     && all
       ( \(mKey, mType) ->
           case Map.lookup mKey n of
-            Just nType -> isSubtype nType mType
+            Just nType -> isSubtype' nType mType
             Nothing -> False
       )
       (Map.toList m)
 -- nothing is a subtype of user objects except bottom types
-isSubtype _ (TUserObject _) = False
+isSubtype' _ (TUserObject _) = False
 -- bottom types, function, tuple, array, user objects are subtypes of object
-isSubtype (TFunction _ _) TObject = True
-isSubtype (TTuple _ _) TObject = True
-isSubtype (TArray _) TObject = True
-isSubtype (TUserObject _) TObject = True
-isSubtype _ TObject = False
+isSubtype' (TFunction _ _) TObject = True
+isSubtype' (TTuple _ _) TObject = True
+isSubtype' (TArray _) TObject = True
+isSubtype' (TUserObject _) TObject = True
+isSubtype' _ TObject = False
 -- bottom types, string literal are subtypes of string
-isSubtype (TStringLiteral _) TString = True
-isSubtype _ TString = False
+isSubtype' (TStringLiteral _) TString = True
+isSubtype' _ TString = False
 -- bottom types, number literal are subtypes of number
-isSubtype (TNumberLiteral _) TNumber = True
-isSubtype _ TNumber = False
+isSubtype' (TNumberLiteral _) TNumber = True
+isSubtype' _ TNumber = False
 -- bottom types, boolean literal are subtypes of boolean
-isSubtype (TBooleanLiteral _) TBoolean = True
-isSubtype _ TBoolean = False
+isSubtype' (TBooleanLiteral _) TBoolean = True
+isSubtype' _ TBoolean = False
 -- everything except null, void, undefined, unknown are subtypes of bracket
-isSubtype t TBracket
+isSubtype' t TBracket
   | t == TNull || t == TVoid || t == TUndefined || t == TUnknown = False
   | otherwise = True
-isSubtype _ _ = False
+isSubtype' _ _ = False
 
 typeCheckConstLiteral :: Literal -> TSTypeChecker TSType
 typeCheckConstLiteral (IntegerLiteral n) = return $ TNumberLiteral n
@@ -133,27 +136,29 @@ typeCheckLiteral UndefinedLiteral = return TUndefined
 typeCheckVar :: Var -> TSTypeChecker TSType
 typeCheckVar (Name n) = lookupVarType n
 typeCheckVar (Dot exp n) = do
-  t <- typeCheckExpr exp
+  t <- typeCheckExpr' False exp
   case t of
     TUserObject m -> case Map.lookup n m of
       Just t -> return t
       Nothing -> throwError $ TypeError $ "field " ++ n ++ " not found in object"
     TObject -> throwError $ TypeError $ "field " ++ n ++ " not found in object"
     _ -> throwError $ TypeError "expected object type"
-typeCheckVar (Element objExp indexExp) = do
-  obj <- typeCheckExpr objExp
+typeCheckVar (Element arrExp indexExp) = do
+  arr <- typeCheckExpr' False arrExp
   index <- typeCheckExpr indexExp
-  case obj of
-    TArray t -> if isSubtype index TNumber then return t else throwError $ TypeError "expected number type for index"
-    TTuple t u -> case index of
-      TNumberLiteral 0 -> return t
-      TNumberLiteral 1 -> return u
-      TNumberLiteral _ -> throwError $ TypeError "no element at index 2 in tuple" -- TODO: check if type error should be thrown
-      t | isSubtype t TNumber -> return (TUnion [t, u])
-      _ -> throwError $ TypeError "expected number type for index"
-    TUserObject _ -> return TAny
-    TObject -> return TAny
-    _ -> throwError $ TypeError "cannot index into type"
+  case arr of
+    TArray t ->
+      if isSubtype index TNumber
+        then return t
+        else return TAny
+    TTuple t u ->
+      case index of
+        TNumberLiteral 0 -> return t
+        TNumberLiteral 1 -> return u
+        TNumberLiteral _ -> throwError $ TypeError "no element at index >=2 in tuple"
+        t | isSubtype t TNumber -> return (TUnion [t, u])
+        _ -> return TAny
+    _ -> return TAny
 
 -- | typechecks an expression, first argument indicate if we want to get the literal type
 typeCheckExpr' :: Bool -> Expression -> TSTypeChecker TSType
