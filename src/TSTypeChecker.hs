@@ -110,18 +110,29 @@ isSubtype t TBracket
   | otherwise = True
 isSubtype _ _ = False
 
+typeCheckConstLiteral :: Literal -> TSTypeChecker TSType
+typeCheckConstLiteral (IntegerLiteral n) = return $ TNumberLiteral n
+typeCheckConstLiteral (StringLiteral s) = return $ TStringLiteral s
+typeCheckConstLiteral (BooleanLiteral b) = return $ TBooleanLiteral b
+typeCheckConstLiteral (ObjectLiteral m) = do
+  m' <- traverse (typeCheckExpr' False) m
+  return $ TUserObject m'
+typeCheckConstLiteral NullLiteral = return TNull
+typeCheckConstLiteral UndefinedLiteral = return TUndefined
+
 typeCheckLiteral :: Literal -> TSTypeChecker TSType
-typeCheckLiteral (IntegerLiteral n) = return $ TNumberLiteral n
-typeCheckLiteral (StringLiteral s) = return $ TStringLiteral s
-typeCheckLiteral (BooleanLiteral b) = return $ TBooleanLiteral b
+typeCheckLiteral (IntegerLiteral _) = return TNumber
+typeCheckLiteral (StringLiteral _) = return TString
+typeCheckLiteral (BooleanLiteral _) = return TBoolean
+typeCheckLiteral (ObjectLiteral m) = do
+  m' <- traverse (typeCheckExpr' False) m
+  return $ TUserObject m'
 typeCheckLiteral NullLiteral = return TNull
 typeCheckLiteral UndefinedLiteral = return TUndefined
 
--- | typechecks an expression, first argument indicate if we want to get the literal type
-typeCheckExpr :: Expression -> TSTypeChecker TSType
-typeCheckExpr (Lit l) = typeCheckLiteral l
-typeCheckExpr (Var (Name n)) = lookupVarType n
-typeCheckExpr (Var (Dot exp n)) = do
+typeCheckVar :: Var -> TSTypeChecker TSType
+typeCheckVar (Name n) = lookupVarType n
+typeCheckVar (Dot exp n) = do
   t <- typeCheckExpr exp
   case t of
     TUserObject m -> case Map.lookup n m of
@@ -129,7 +140,7 @@ typeCheckExpr (Var (Dot exp n)) = do
       Nothing -> throwError $ TypeError $ "field " ++ n ++ " not found in object"
     TObject -> throwError $ TypeError $ "field " ++ n ++ " not found in object"
     _ -> throwError $ TypeError "expected object type"
-typeCheckExpr (Var (Element objExp indexExp)) = do
+typeCheckVar (Element objExp indexExp) = do
   obj <- typeCheckExpr objExp
   index <- typeCheckExpr indexExp
   case obj of
@@ -137,11 +148,26 @@ typeCheckExpr (Var (Element objExp indexExp)) = do
     TTuple t u -> case index of
       TNumberLiteral 0 -> return t
       TNumberLiteral 1 -> return u
-      TNumberLiteral _ -> throwError $ TypeError "no element at index 2 in tuple"
+      TNumberLiteral _ -> throwError $ TypeError "no element at index 2 in tuple" -- TODO: check if type error should be thrown
       t | isSubtype t TNumber -> return (TUnion [t, u])
       _ -> throwError $ TypeError "expected number type for index"
-    _ -> throwError $ TypeError "expected array type"
-typeCheckExpr _ = undefined
+    TUserObject _ -> return TAny
+    TObject -> return TAny
+    _ -> throwError $ TypeError "cannot index into type"
+
+-- | typechecks an expression, first argument indicate if we want to get the literal type
+typeCheckExpr' :: Bool -> Expression -> TSTypeChecker TSType
+typeCheckExpr' getLiteralType (Lit l) =
+  if getLiteralType then typeCheckConstLiteral l else typeCheckLiteral l
+typeCheckExpr' _ (Var v) = typeCheckVar v
+typeCheckExpr' _ (AnnotatedExpression t e) = do
+  e' <- typeCheckExpr e
+  if isSubtype e' t then return t else throwError $ TypeError "type mismatch"
+typeCheckExpr' _ _ = undefined
+
+-- | typechecks an expression
+typeCheckExpr :: Expression -> TSTypeChecker TSType
+typeCheckExpr = typeCheckExpr' True
 
 -- | typechecks a statement
 typeCheckStmt :: Statement -> TSTypeChecker ()

@@ -41,6 +41,7 @@ data Statement
 data Expression
   = Var Var -- global variables x and table indexing
   | Lit Literal -- literal values
+  | AnnotatedExpression TSType Expression -- e : type
   | UnaryOpPrefix UopPrefix Expression -- unary operators
   | UnaryOpPostfix Expression UopPostfix -- unary operators
   | BinaryOp Expression Bop Expression -- binary operators
@@ -53,7 +54,8 @@ data Literal
   | BooleanLiteral Bool -- true or false
   | NullLiteral -- null
   | UndefinedLiteral -- undefined
-  deriving (Eq, Show, Ord)
+  | ObjectLiteral (Map String Expression) -- { x: e1, y: e2 }
+  deriving (Eq, Show)
 
 data UopPrefix
   = Not -- `!` :: a -> Bool

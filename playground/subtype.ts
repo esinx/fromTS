@@ -88,4 +88,22 @@ const index1 = arr2[1]; // number | string
 
 const tuple2: [number, string] = [1, "hi"];
 const num = 1 + 1
-const index2 = tuple2[num]; // string
+
+const index2 = tuple2[any2]; // string | number
+const index3 = tuple2[2];
+const index4 = tuple2[1]; // string
+
+const xIndex = x[0]; // any
+
+const newObj = {};
+
+const newObjIndex = newObj[0]; // any
+
+const obj = {
+    a: 1,
+    b: "hi"
+}
+
+const objOfObj = {
+    a: obj
+}
