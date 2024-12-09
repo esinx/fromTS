@@ -11,7 +11,7 @@ import TSError
 import TSSyntax
 import TSType
 
--- for equivalence
+-- | for equivalence
 simplify :: TSType -> TSType
 -- {} | null | undefined = unknown
 simplify (TUnion ts) | List.sort ts == List.sort [TBracket, TNull, TUndefined] = TUnknown
