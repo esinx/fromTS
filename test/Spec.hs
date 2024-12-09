@@ -90,6 +90,10 @@ test_subtyping =
         isSubtype (TUnion [TBracket, TNull, TUndefined]) TUnknown
           ~?= True,
         isSubtype (TUnion [TNull, TBracket, TUndefined]) TUnknown
+          ~?= True,
+        isSubtype
+          (TUserObject (Map.fromList [("x", TNumber), ("y", TBoolean)]))
+          (TUserObject (Map.fromList [("x", TNumber)]))
           ~?= True
       ]
 
