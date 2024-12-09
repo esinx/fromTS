@@ -85,3 +85,7 @@ const check2: unknown = union; // Ok
 
 const arr2 = [1, "hi", 3];
 const index1 = arr2[1]; // number | string
+
+const tuple2: [number, string] = [1, "hi"];
+const num = 1 + 1
+const index2 = tuple2[num]; // string

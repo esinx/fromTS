@@ -117,32 +117,31 @@ typeCheckLiteral (BooleanLiteral _) = return TBoolean
 typeCheckLiteral NullLiteral = return TNull
 typeCheckLiteral UndefinedLiteral = return TUndefined
 
-typeCheckConstLiteral :: Literal -> TSTypeChecker TSType
-typeCheckConstLiteral (IntegerLiteral n) = return $ TNumberLiteral n
-typeCheckConstLiteral (StringLiteral s) = return $ TStringLiteral s
-typeCheckConstLiteral (BooleanLiteral b) = return $ TBooleanLiteral b
-typeCheckConstLiteral NullLiteral = return TNull
-typeCheckConstLiteral UndefinedLiteral = return TUndefined
-
 -- | typechecks an expression, first argument indicate if we want to get the literal type
-typeCheckExpr :: Bool -> Expression -> TSTypeChecker TSType
-typeCheckExpr isConst (Lit l) = if isConst then typeCheckConstLiteral l else typeCheckLiteral l
-typeCheckExpr _ (Var (Name n)) = lookupVarType n
-typeCheckExpr _ (Var (Dot exp n)) = do
-  t <- typeCheckExpr False exp
+typeCheckExpr :: Expression -> TSTypeChecker TSType
+typeCheckExpr (Lit l) = typeCheckLiteral l
+typeCheckExpr (Var (Name n)) = lookupVarType n
+typeCheckExpr (Var (Dot exp n)) = do
+  t <- typeCheckExpr exp
   case t of
     TUserObject m -> case Map.lookup n m of
       Just t -> return t
       Nothing -> throwError $ TypeError $ "field " ++ n ++ " not found in object"
     TObject -> throwError $ TypeError $ "field " ++ n ++ " not found in object"
     _ -> throwError $ TypeError "expected object type"
-typeCheckExpr _ (Var (Element exp1 exp2)) = do
-  t1 <- typeCheckExpr False exp1
-  t2 <- typeCheckExpr False exp2
-  case t1 of
-    TArray t -> if isSubtype t2 TNumber then return t else throwError $ TypeError "expected number type"
+typeCheckExpr (Var (Element objExp indexExp)) = do
+  obj <- typeCheckExpr objExp
+  index <- typeCheckExpr indexExp
+  case obj of
+    TArray t -> if isSubtype index TNumber then return t else throwError $ TypeError "expected number type for index"
+    TTuple t u -> case index of
+      TNumberLiteral 0 -> return t
+      TNumberLiteral 1 -> return u
+      TNumberLiteral _ -> throwError $ TypeError "no element at index 2 in tuple"
+      t | isSubtype t TNumber -> return (TUnion [t, u])
+      _ -> throwError $ TypeError "expected number type for index"
     _ -> throwError $ TypeError "expected array type"
-typeCheckExpr _ _ = undefined
+typeCheckExpr _ = undefined
 
 -- | typechecks a statement
 typeCheckStmt :: Statement -> TSTypeChecker ()
