@@ -111,9 +111,9 @@ isSubtype t TBracket
 isSubtype _ _ = False
 
 typeCheckLiteral :: Literal -> TSTypeChecker TSType
-typeCheckLiteral (IntegerLiteral _) = return TNumber
-typeCheckLiteral (StringLiteral _) = return TString
-typeCheckLiteral (BooleanLiteral _) = return TBoolean
+typeCheckLiteral (IntegerLiteral n) = return $ TNumberLiteral n
+typeCheckLiteral (StringLiteral s) = return $ TStringLiteral s
+typeCheckLiteral (BooleanLiteral b) = return $ TBooleanLiteral b
 typeCheckLiteral NullLiteral = return TNull
 typeCheckLiteral UndefinedLiteral = return TUndefined
 
