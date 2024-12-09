@@ -104,6 +104,36 @@ const obj = {
     b: "hi"
 }
 
+const rough2 = num.c;
+
 const objOfObj = {
     a: obj
 }
+
+const rough = num[0];
+
+// typeCheckVar
+
+const userObj = {
+    name: "John",
+    age: 30
+}
+
+const n = userObj.name; // string
+const objectIndex = {}.name;
+const n2 = userObj.bad;
+
+const arr = [1, "hi", 3];
+
+const nonObj = arr.hi;
+
+const arrIndex1 = arr[1];
+
+const arrIndex2 = arr["hi"]; // number | string
+
+const tupleee: [number, string] = [1, "hi"];
+const tupleIndex = tupleee[1]; // string
+const tupleIndex2 = 1["hi"]; // number | string
+
+let arrOut = [1, 2, 3];
+arrOut["hi"] = 4; // Ok
