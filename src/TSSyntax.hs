@@ -26,7 +26,7 @@ data Statement
   = ConstAssignment Var Expression -- const x : type = e
   | LetAssignment Var Expression -- let x : type = e
   | If Expression Block Block -- if (e) { s1 } else { s2 }
-  | For Expression Expression Expression Block -- for (e1; e2; e3) { s }
+  | For Statement Expression Expression Block -- for (e1; e2; e3) { s }
   | While Expression Block -- while (e) { s }
   | Break
   | Continue

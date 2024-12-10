@@ -17,12 +17,18 @@ import TSType
 simplify :: TSType -> TSType
 -- {} | null | undefined = unknown
 simplify (TUnion ts) | List.sort ts == List.sort [TBracket, TNull, TUndefined] = TUnknown
-simplify (TUnion [t]) = t
-simplify (TUnion ts) = TUnion $ List.sort $ List.nub $ map simplify ts
-simplify (TIntersection [t]) = t
 simplify (TIntersection ts) | TNever `elem` ts = TNever
-simplify (TIntersection ts) = TIntersection $ List.sort $ List.nub $ map simplify ts
--- TODO: there might be other types that are equivalent to some union types
+simplify (TUnion ts) = simplifyUnions (TUnion ts) False
+  where
+    -- TODO: there might be other types that are equivalent to some union types
+    simplifyUnions (TUnion ts) False = simplifyUnions (TUnion $ List.sort $ List.nub $ map simplify ts) True
+    simplifyUnions (TUnion [t]) _ = simplify t
+    simplifyUnions t _ = t
+simplify (TIntersection ts) = simplifyIntersections (TIntersection ts) False
+  where
+    simplifyIntersections (TIntersection ts) False = simplifyIntersections (TIntersection $ List.sort $ List.nub $ map simplify ts) True
+    simplifyIntersections (TIntersection [t]) _ = simplify t
+    simplifyIntersections t _ = t
 simplify t = t
 
 isSubtype :: TSType -> TSType -> Bool
@@ -241,29 +247,67 @@ typeCheckExpr :: Expression -> TSTypeChecker TSType
 typeCheckExpr = typeCheckExpr' True
 
 -- | typechecks a statement
-typeCheckStmt :: Statement -> TSTypeChecker TSTypeEnv -> TSTypeChecker TSTypeEnv
-typeCheckStmt (ConstAssignment (Name n) e) comp = do
+typeCheckStmt :: Statement -> Maybe TSType -> TSTypeChecker TSTypeEnv -> TSTypeChecker TSTypeEnv
+typeCheckStmt (ConstAssignment (Name n) e) toReturn comp = do
   t <- typeCheckExpr e
   putVarEnv n t comp
-typeCheckStmt (LetAssignment (Name n) e) comp =
+typeCheckStmt (LetAssignment (Name n) e) toReturn comp =
   do
     t <- typeCheckExpr' False e
     putVarEnv n t comp
-typeCheckStmt (If e thenBlock elseBlock) comp = do
+typeCheckStmt (If e thenBlock elseBlock) toReturn comp = do
   t <- typeCheckExpr e
-  if isSubtype t TBoolean
+  if isSubtype t TBoolean || isSubtype t TNumber -- TODO: not sure if more things should be allowed
     then do
-      env <- typeCheckBlock thenBlock
-      env' <- typeCheckBlock elseBlock
+      _ <- createNewVarEnv $ typeCheckBlock thenBlock toReturn
+      _ <- createNewVarEnv $ typeCheckBlock elseBlock toReturn
       comp
     else throwError $ TypeError "expected boolean type"
-typeCheckStmt _ _ = undefined
+typeCheckStmt (For varInit guard incr block) toReturn comp = do
+  _ <-
+    createNewVarEnv $
+      typeCheckStmt
+        varInit
+        Nothing
+        ( do
+            t <- typeCheckExpr guard
+            if isSubtype t TBoolean || isSubtype t TNumber -- TODO: not sure if more things should be allowed
+              then do
+                _ <- typeCheckExpr incr
+                typeCheckBlock block toReturn
+              else throwError $ TypeError "expected boolean type"
+        )
+  comp
+typeCheckStmt (While e block) toReturn comp = do
+  t <- typeCheckExpr e
+  if isSubtype t TBoolean || isSubtype t TNumber -- TODO: not sure if more things should be allowed
+    then do
+      _ <- createNewVarEnv $ typeCheckBlock block toReturn
+      comp
+    else throwError $ TypeError "expected boolean type"
+typeCheckStmt Break _ comp = comp
+typeCheckStmt Continue _ comp = comp
+typeCheckStmt (Try tryBlock (Var (Name n)) catchBlock) toReturn comp = do
+  _ <- typeCheckBlock tryBlock toReturn
+  _ <- putVarEnv n TAny (createNewVarEnv $ typeCheckBlock catchBlock toReturn)
+  comp
+typeCheckStmt (Try tryBlock _ catchBlock) toReturn comp =
+  throwError $ TypeError "expected identifier in catch block"
+typeCheckStmt (Return e) toReturn comp = do
+  t <- typeCheckExpr e
+  case toReturn of
+    Just t' -> if isSubtype t t' then comp else throwError $ TypeError "type mismatch"
+    Nothing -> throwError $ TypeError "cannot return in this context"
+-- TODO: typeCheckStmt (Switch e cases) toReturn comp =, functions
+typeCheckStmt (LabeledStatement _ s) toReturn comp = typeCheckStmt s toReturn comp
+typeCheckStmt Empty _ comp = comp
+typeCheckStmt _ _ _ = undefined
 
 -- | typechecks a block
-typeCheckBlock :: Block -> TSTypeChecker TSTypeEnv
-typeCheckBlock (Block []) = ask
-typeCheckBlock (Block (s : ss)) = do
-  typeCheckStmt s (typeCheckBlock (Block ss))
+typeCheckBlock :: Block -> Maybe TSType -> TSTypeChecker TSTypeEnv
+typeCheckBlock (Block []) _ = ask
+typeCheckBlock (Block (s : ss)) toReturn = do
+  typeCheckStmt s toReturn (typeCheckBlock (Block ss) toReturn)
 
 -- | typechecks a program with the initial type environment
 -- and empty variable bindings
@@ -271,7 +315,7 @@ typeCheckProgram ::
   Block ->
   Either Error (Map.Map String TSType)
 typeCheckProgram b = do
-  env <- runReaderT (typeCheckBlock b) initialTSTypeEnv
+  env <- runReaderT (typeCheckBlock b Nothing) initialTSTypeEnv
   case varEnvs env of
     [] -> throwError $ TypeError "empty env" -- TODO: returning empty instead of throwing error, but this should never happen
     currEnv : _ -> return currEnv

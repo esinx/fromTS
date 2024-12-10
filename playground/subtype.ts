@@ -190,6 +190,26 @@ const varrrrr = [1, 2, 3]
 varrrr == varrrrr
 
 
-if () {
+// if () {
+//     console.log("hi")
+// }
+
+// let x = if (true) { return 1 } else { return 2 };
+
+try {
     console.log("hi")
+} catch (e) {
+    console.log("hi")
+}
+
+switch (1) {
+    case 1:
+        console.log("hi")
+        break;
+    default:
+        console.log("hi")
+}
+
+if (1) {
+    let x = 3;
 }

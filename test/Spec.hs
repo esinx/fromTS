@@ -46,6 +46,15 @@ test_typeChecker =
       test_typeCheckProg
     ]
 
+test_simplify :: Test
+test_simplify =
+  "simplify tests"
+    ~: TestList
+      [ simplify
+          (TIntersection [TIntersection [TIntersection [TIntersection [TIntersection [TIntersection [TNever]]]]]])
+          ~?= TNever
+      ]
+
 test_subtyping :: Test
 test_subtyping =
   "subtyping tests"
@@ -118,6 +127,7 @@ test_typeCheckStmt =
                   (Name "x")
                   (Lit (BooleanLiteral True))
               )
+              Nothing
               ask
           )
           initialTSTypeEnv
