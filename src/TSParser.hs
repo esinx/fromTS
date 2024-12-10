@@ -12,6 +12,7 @@ import System.IO qualified as IO
 import System.IO.Error qualified as IO
 import TSNumber
 import TSSyntax
+import TSType
 import Test.HUnit
 import Test.QuickCheck (Arbitrary (..), Gen)
 import Test.QuickCheck qualified as QC
@@ -313,6 +314,9 @@ reserved =
 -- Right ["x","sfds","_"]
 nameP :: Parser Name
 nameP = undefined
+
+typeP :: Parser TSType.TSType
+typeP = undefined
 
 -- >>> parse (many uopPrefixP) "- - ... --"
 -- Left (line 1, column 1):

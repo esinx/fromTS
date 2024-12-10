@@ -3,7 +3,7 @@ import Control.Monad.State
 import Control.Monad.State qualified as S
 import Data.Aeson qualified as JSON
 import Data.ByteString.Lazy.UTF8 as BLU
-import Data.Map
+import Data.Map as Map
 import GHC.IO (unsafePerformIO)
 import GHC.IO.Exception (ExitCode (ExitFailure, ExitSuccess))
 import System.Process (readProcessWithExitCode)
@@ -14,6 +14,7 @@ import TSType
 import TSTypeChecker
 import Test.HUnit
 import Test.QuickCheck
+import Prelude
 
 main :: IO ()
 main = do
@@ -248,17 +249,16 @@ prop_ioDifferential b =
             []
         return $ property $ match result typeCheckResult
   where
-    match :: (ExitCode, String, String) -> Either Error TSGlobalEnv -> Bool
-    match (ExitSuccess, stdout, _) (Right tsEnv) =
-      let typeMap = JSON.decode $ BLU.fromString stdout :: Maybe (Map String String)
-       in case typeMap of
+    match :: (ExitCode, String, String) -> Either Error (Map String TSType) -> Bool
+    match (ExitSuccess, stdout, _) (Right typeMap) =
+      let truthTypeMap = JSON.decode $ BLU.fromString stdout :: Maybe (Map String String)
+       in case truthTypeMap of
             Just tm ->
-              let entries = Data.Map.toAscList tsEnv
+              let entries = Map.toAscList typeMap
                in all
                     ( \(name, t) ->
-                        case Data.Map.lookup name tm of
-                          -- TODO: Make string to TSType conversion and use Eq instance
-                          Just t' -> show t == t'
+                        case Map.lookup name tm of
+                          Just t' -> parse typeP t' == Right t
                           Nothing -> False
                     )
                     entries
