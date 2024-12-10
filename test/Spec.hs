@@ -128,7 +128,8 @@ test_typeCheckProg :: Test
 test_typeCheckProg =
   "program type checking tests"
     ~: TestList
-      [ typeCheckProgram
+      [ -- let x = true; let y = x;
+        typeCheckProgram
           ( Block
               [ LetAssignment
                   (Name "x")
@@ -139,6 +140,20 @@ test_typeCheckProg =
               ]
           )
           ~?= Right (Map.fromList [("x", TBoolean), ("y", TBoolean)]),
+        -- let x = true; if (x) { let y = true; } else { let y = false; }
+        typeCheckProgram
+          ( Block
+              [ LetAssignment
+                  (Name "x")
+                  (Lit (BooleanLiteral True)),
+                If
+                  (Var (Name "x"))
+                  (Block [LetAssignment (Name "y") (Lit (BooleanLiteral True))])
+                  (Block [LetAssignment (Name "y") (Lit (BooleanLiteral False))])
+              ]
+          )
+          ~?= Right (Map.fromList [("x", TBoolean)]),
+        -- let x = true; let y: string = x;
         typeCheckProgram
           ( Block
               [ LetAssignment

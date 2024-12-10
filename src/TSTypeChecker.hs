@@ -249,6 +249,14 @@ typeCheckStmt (LetAssignment (Name n) e) comp =
   do
     t <- typeCheckExpr' False e
     putVarEnv n t comp
+typeCheckStmt (If e thenBlock elseBlock) comp = do
+  t <- typeCheckExpr e
+  if isSubtype t TBoolean
+    then do
+      env <- typeCheckBlock thenBlock
+      env' <- typeCheckBlock elseBlock
+      comp
+    else throwError $ TypeError "expected boolean type"
 typeCheckStmt _ _ = undefined
 
 -- | typechecks a block
