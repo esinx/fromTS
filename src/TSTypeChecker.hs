@@ -253,8 +253,7 @@ typeCheckStmt _ _ = undefined
 
 -- | typechecks a block
 typeCheckBlock :: Block -> TSTypeChecker TSTypeEnv
-typeCheckBlock (Block []) = do
-  ask
+typeCheckBlock (Block []) = ask
 typeCheckBlock (Block (s : ss)) = do
   typeCheckStmt s (typeCheckBlock (Block ss))
 

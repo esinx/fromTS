@@ -138,7 +138,18 @@ test_typeCheckProg =
                   (Var (Name "x"))
               ]
           )
-          ~?= Right (Map.fromList [("x", TBoolean), ("y", TBoolean)])
+          ~?= Right (Map.fromList [("x", TBoolean), ("y", TBoolean)]),
+        typeCheckProgram
+          ( Block
+              [ LetAssignment
+                  (Name "x")
+                  (Lit (BooleanLiteral True)),
+                LetAssignment
+                  (Name "y")
+                  (AnnotatedExpression TString (Var (Name "x")))
+              ]
+          )
+          ~?= Left (TypeError "type mismatch")
       ]
 
 -- properties for the typechecker
