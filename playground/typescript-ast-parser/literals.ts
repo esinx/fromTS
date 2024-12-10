@@ -14,26 +14,20 @@ const arrOfArr = [
 ];
 const arrOfMixed = [1, "a", true, { key: "value" }, [1, 2, 3]];
 const nullLiteral = null;
-// numbers
-const decimal = 42; // Standard integer
-const decimalFloat = 42.42; // Floating-point
 
-const binary = 0b101010; // 42 in binary
-const octal = 0o52; // 42 in octal
-const hexadecimal = 0x2a; // 42 in hexadecimal
+const decimal = 42;
+const decimalFloat = 42.42;
 
-// NOT SUPPORTING BIGINT: (not available when targeting lower than ES2020)
-// const bigInt = 42n; // BigInt literal
-// const bigIntHex = 0x2an; // BigInt in hexadecimal
-// const bigIntBinary = 0b101010n; // BigInt in binary
-// const bigIntOctal = 0o52n; // BigInt in octal
+const binary = 0b101010;
+const octal = 0o52;
+const hexadecimal = 0x2a;
 
-const scientific = 4.2e1; // 42 in scientific notation
-const scientificNegative = 4.2e-1; // 0.42
+const scientific = 4.2e1;
+const scientificNegative = 4.2e-1;
 
-const infinity = Infinity; // Positive infinity
-const negativeInfinity = -Infinity; // Negative infinity
-const nan = NaN; // Not a Number
+const infinity = Infinity;
+const negativeInfinity = -Infinity;
+const nan = NaN;
 
 console.log(
     decimal,
@@ -50,8 +44,6 @@ console.log(
 
 console.log(typeof nan);
 
-// console.log(NaN === NaN); // false? but it's an error
-
 console.log(5 === 5.0);
 
 type Test1 = {
@@ -64,7 +56,7 @@ interface Test2 {
 
 const test1: Test2 = { test: 5 };
 
-console.log(typeof test1.test); // number
+console.log(typeof test1.test);
 
 console.log(Infinity === Infinity);
 
