@@ -267,13 +267,55 @@ instance PP Statement where
   pp _ = undefined
 
 level :: Bop -> Int
--- level Times = 7
--- level Divide = 7
--- level Plus = 5
--- level Minus = 5
--- level Concat = 4
--- level _ = 3 -- comparison operators
-level _ = undefined
+level b = case b of
+  Comma -> 1
+
+  Assign -> 2
+  PlusAssign -> 2
+  MinusAssign -> 2
+  TimesAssign -> 2
+  DivAssign -> 2
+  ModAssign -> 2
+  ExpAssign -> 2
+  BitAndAssign -> 2
+  BitOrAssign -> 2
+  BitXorAssign -> 2
+  LeftShiftAssign -> 2
+  RightShiftAssign -> 2
+  UnsignedRightShiftAssign -> 2
+  AndAssign -> 2
+  OrAssign -> 2
+  NullishCoalescingAssign -> 2
+
+  NullishCoalescing -> 3
+  Or -> 4
+  And -> 5
+  BitOr -> 6
+  BitXor -> 7
+  BitAnd -> 8
+  Eq -> 9
+  Neq -> 9
+  EqStrict -> 9
+  NeqStrict -> 9
+  Lt -> 10
+  Le -> 10
+  Gt -> 10
+  Ge -> 10
+  In -> 10
+  InstanceOf -> 10
+
+  LeftShift -> 11
+  RightShift -> 11
+  UnsignedRightShift -> 11
+
+  PlusBop -> 12
+  MinusBop -> 12
+
+  Times -> 13
+  Div -> 13
+  Mod -> 13
+
+  Exp -> 14
 
 -- instance (PP a) => PP (Map Value a) where
 --   pp :: (PP a) => Map Value a -> Doc

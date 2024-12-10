@@ -1,7 +1,7 @@
 module TSParser where
 
 import Control.Applicative
-import Control.Monad (mapM_)
+import Control.Monad (guard, mapM_)
 import Data.Char qualified as Char
 import Data.Functor
 import Data.List (foldl')
@@ -12,6 +12,7 @@ import System.IO qualified as IO
 import System.IO.Error qualified as IO
 import TSNumber
 import TSSyntax
+import TSType
 import Test.HUnit
 import Test.QuickCheck (Arbitrary (..), Gen)
 import Test.QuickCheck qualified as QC
@@ -33,6 +34,9 @@ type ParserError = P.ParseErrorBundle String Void
 parse :: Parser a -> String -> Either ParserError a
 parse = flip P.parse ""
 
+filterP :: (a -> Bool) -> Parser a -> Parser a
+filterP f p = P.try $ p >>= \x -> if f x then pure x else fail "Predicate not satisfied"
+
 -- | Tests parsing the pretty printed value of a literal, should match
 prop_roundtrip_lit :: Literal -> Bool
 prop_roundtrip_lit v = parse literalP (pretty v) == Right v
@@ -52,7 +56,7 @@ prop_roundtrip_block s = parse blockP (pretty s) == Right s
 --------------------------------------------------------------------------------
 
 wsP :: Parser a -> Parser a
-wsP p = p <* P.space
+wsP p = P.try $ p <* P.space
 
 test_wsP :: Test
 test_wsP =
@@ -94,13 +98,16 @@ test_constP =
 -- Counts {cases = 2, tried = 2, errors = 0, failures = 0}
 
 parens :: Parser a -> Parser a
-parens = P.between (stringP "(") (stringP ")") -- TODO: Need P.try?
+parens = P.between (stringP "(") (stringP ")")
 
 braces :: Parser a -> Parser a
 braces = P.between (stringP "{") (stringP "}")
 
 brackets :: Parser a -> Parser a
 brackets = P.between (stringP "[") (stringP "]")
+
+abrackets :: Parser a -> Parser a
+abrackets = P.between (stringP "<") (stringP ">")
 
 -- >>> parse (many (parens (constP "1" 1))) "(1) (  1)   (1 )"
 -- Right [1,1,1]
@@ -164,83 +171,177 @@ scientificP =
       <*> signed intP
 
 -- | Parse a TS number
--- >>> parse (many (wsP numberP)) "1 0 23 -23 1.0 5.0 -5.0 5. .5 0.5 -.5 -0.5 -124. 1e1 1E1 10e1 10.e1 -.10e1 0.1e2 5E-5 2e-2 -1.0e1 -0.e2 0b1 0B1110 -0o4 -0O771 0x1 -0XFaC3 0XC0DE -Infinity Infinity NaN 5"
+-- >>> parse (many (wsP numberValP)) "1 0 23 -23 1.0 5.0 -5.0 5. .5 0.5 -.5 -0.5 -124. 1e1 1E1 10e1 10.e1 -.10e1 0.1e2 5E-5 2e-2 -1.0e1 -0.e2 0b1 0B1110 -0o4 -0O771 0x1 -0XFaC3 0XC0DE -Infinity Infinity NaN 5"
 -- Right [1,0,23,-23,1.0,5.0,-5.0,5.0,0.5,0.5,-0.5,-0.5,-124.0,10.0,10.0,100.0,100.0,-1.0,10.0,5.0e-5,2.0e-2,-10.0,-0.0,1,14,-4,-505,1,-64195,49374,-Infinity,Infinity,NaN,5]
-numberP :: Parser Number
-numberP =
-  wsP $
-    NaN <$ (P.string "NaN" <|> P.string "-NaN")
-      <|> NInfinity <$ stringP "-Infinity"
-      <|> Infinity <$ stringP "Infinity"
-      <|> Double <$> signed scientificP
-      <|> Double <$> signed doubleP
-      <|> Int <$> signed binaryP
-      <|> Int <$> signed octalP
-      <|> Int <$> signed hexP
-      <|> Int <$> signed intP
+numberValP :: Parser Number
+numberValP =
+  wsP
+    ( NaN <$ (P.try (P.string "NaN") <|> P.try (P.string "-NaN"))
+        <|> P.try (NInfinity <$ stringP "-Infinity")
+        <|> P.try (Infinity <$ stringP "Infinity")
+        <|> Double <$> signed scientificP
+        <|> Double <$> signed doubleP
+        <|> Int <$> signed binaryP
+        <|> Int <$> signed octalP
+        <|> Int <$> signed hexP
+        <|> Int <$> signed intP
+    )
 
--- >>> parse (many numberLitP) "1 2\n 3"
--- Right [NumberLiteral 1,NumberLiteral 2,NumberLiteral 3]
-numberLitP :: Parser Literal
-numberLitP = wsP (NumberLiteral <$> numberP)
-
--- >>> parse (many boolLitP) "true false\n true"
--- Right [BooleanLiteral True,BooleanLiteral False,BooleanLiteral True]
-boolLitP :: Parser Literal
-boolLitP =
-  BooleanLiteral <$> (True <$ stringP "true" <|> False <$ stringP "false")
+-- >>> parse (many boolValP) "true false\n true"
+-- Right [True,False,True]
+boolValP :: Parser Bool
+boolValP = P.try (True <$ stringP "true" <|> False <$ stringP "false")
 
 -- TODO: Support nested strings and escaping
-stringLitP :: Parser Literal
-stringLitP =
-  StringLiteral
-    <$> P.between (P.char '"') (stringP "\"") (many (P.satisfy (/= '"')))
-    <|> StringLiteral
-      <$> P.between (P.char '\'') (stringP "'") (many (P.satisfy (/= '\'')))
-    <|> StringLiteral
-      <$> P.between (P.char '`') (stringP "`") (many (P.satisfy (/= '`')))
+stringValP :: Parser String
+stringValP =
+  P.try (P.between (P.char '"') (stringP "\"") (many (P.satisfy (/= '"'))))
+    <|> P.try (P.between (P.char '\'') (stringP "'") (many (P.satisfy (/= '\''))))
+    <|> P.try (P.between (P.char '`') (stringP "`") (many (P.satisfy (/= '`'))))
 
 test_stringValP :: Test
 test_stringValP =
   TestList
-    [ P.parse stringLitP "" "\"a\"" ~?= Right (StringLiteral "a"),
-      P.parse stringLitP "" "\"a\\\"\"" ~?= Right (StringLiteral "a\\"),
-      P.parse (many stringLitP) "" "\"a\"   \"b\""
-        ~?= Right [StringLiteral "a", StringLiteral "b"],
-      P.parse (many stringLitP) "" "\" a\"   \"b\""
-        ~?= Right [StringLiteral " a", StringLiteral "b"]
+    [ parse stringValP "\"a\"" ~?= Right ("a"),
+      parse stringValP "\"a\\\"\"" ~?= Right ("a\\"),
+      parse (many stringValP) "\"a\"   \"b\""
+        ~?= Right ["a", "b"],
+      parse (many stringValP) "\" a\"   \"b\""
+        ~?= Right [" a", "b"]
     ]
 
 -- >>> runTestTT test_stringValP
 -- Counts {cases = 4, tried = 4, errors = 0, failures = 0}
 
--- >>> parse (many nullLitP) "null null\n null"
--- Right [NullLiteral,NullLiteral,NullLiteral]
-nullLitP :: Parser Literal
-nullLitP = NullLiteral <$ stringP "null"
-
--- >>> parse (many undefinedLitP) "undefined undefined\n undefined"
--- Right [UndefinedLiteral,UndefinedLiteral,UndefinedLiteral]
-undefinedLitP :: Parser Literal
-undefinedLitP = UndefinedLiteral <$ stringP "undefined"
-
 -- TODO: Support Object literals
 literalP :: Parser Literal
-literalP = numberLitP <|> boolLitP <|> nullLitP <|> undefinedLitP <|> stringLitP
+literalP =
+  wsP
+    ( NumberLiteral <$> numberValP
+        <|> BooleanLiteral <$> boolValP
+        <|> P.try (NullLiteral <$ stringP "null")
+        <|> P.try (UndefinedLiteral <$ stringP "undefined")
+        <|> StringLiteral <$> stringValP
+    )
 
-expP :: Parser Expression
-expP = undefined
+arrayTypeP :: Parser TSType
+arrayTypeP = P.try (stringP "Array" *> abrackets typeP) <|> P.try (TArray <$> (typeP <* brackets (pure ())))
+
+tupleP :: Parser [TSType]
+tupleP = P.try $ brackets (typeP `P.sepBy` stringP ",")
+
+unionP :: Parser [TSType]
+unionP = P.try $ typeP `P.sepBy` stringP "|"
+
+intersectionP :: Parser [TSType]
+intersectionP = P.try $ typeP `P.sepBy` stringP "&"
+
+-- TODO: Add bracket, object, UserObject, function
+typeP :: Parser TSType
+typeP =
+  TBooleanLiteral <$> boolValP
+    <|> TBoolean <$ stringP "boolean"
+    <|> TNumberLiteral <$> signed scientificP
+    <|> TNumberLiteral <$> signed doubleP
+    <|> TNumberLiteral . fromIntegral <$> signed binaryP
+    <|> TNumberLiteral . fromIntegral <$> signed octalP
+    <|> TNumberLiteral . fromIntegral <$> signed hexP
+    <|> TNumberLiteral . fromIntegral <$> signed intP
+    <|> TNumber <$ stringP "number"
+    <|> TStringLiteral <$> stringValP
+    <|> TString <$ stringP "string"
+    <|> TArray <$> arrayTypeP
+    <|> TUnion <$> tupleP -- TODO: FIX TUPLES
+    <|> TUnknown <$ stringP "unknown"
+    <|> TAny <$ stringP "any"
+    <|> TNever <$ stringP "never"
+    <|> TVoid <$ stringP "void"
+    <|> TNull <$ stringP "null"
+    <|> TUndefined <$ stringP "undefined"
+    <|> TUnion <$> unionP -- TODO: FIX UNION AND INTERSECTION PRIORITY/PRECEDENCE
+    <|> TIntersection <$> intersectionP
+
+baseExpP :: Parser Expression
+baseExpP =
+  wsP
+    ( P.try (Lit <$> literalP)
+        <|> P.try (Array <$> brackets (expP `P.sepBy` stringP ","))
+        <|> P.try (Var <$> varP)
+        <|> P.try (parens expP)
+    )
+
+annotatedExpP :: Parser Expression
+annotatedExpP = P.try $ do
+  e <- baseExpP
+  me <- optional (stringP ":" *> typeP)
+  case me of
+    Just t -> return (AnnotatedExpression t e)
+    Nothing -> return e
+
+prefixExpP :: Parser Expression
+prefixExpP =
+  P.try (UnaryOpPrefix <$> uopPrefixP <*> prefixExpP) <|> P.try annotatedExpP
+
+postfixExpP :: Parser Expression
+postfixExpP = P.try $ do
+  e <- prefixExpP
+  me <- optional uopPostfix
+  case me of
+    Just op -> return (UnaryOpPostfix e op)
+    Nothing -> return e
+
+-- | Parses one or more occurrences of @p@ separated by binary operator
+-- parser @pop@.  Returns a value produced by a /left/ associative application
+-- of all functions returned by @pop@.
+-- See the end of the `Parsers` lecture for explanation of this operator.
+chainl1 :: Parser a -> Parser (a -> a -> a) -> Parser a
+p `chainl1` pop = foldl comb <$> p <*> rest
+  where
+    comb x (op, y) = x `op` y
+    rest = many ((,) <$> pop <*> p)
 
 -- | Parse an operator at a specified precedence level
 opAtLevel :: Int -> Parser (Expression -> Expression -> Expression)
-opAtLevel = undefined
+opAtLevel l = flip BinaryOp <$> filterP (\x -> level x == l) bopP
 
--- opAtLevel l = flip Op2 <$> P.filter (\x -> level x == l) bopP
+chainLevel :: Parser Expression -> Int -> Parser Expression
+chainLevel sub l = sub `chainl1` opAtLevel l
+
+expP :: Parser Expression
+expP =
+  let exp14 = chainLevel postfixExpP 14 -- exp
+      exp13 = chainLevel exp14 13 -- mult., /, %
+      exp12 = chainLevel exp13 12 -- +, -
+      exp11 = chainLevel exp12 11 -- <<, >>, >>>
+      exp10 = chainLevel exp11 10 -- <, <=, >, >=, in, instanceof
+      exp9 = chainLevel exp10 9 -- ==, !=, ===, !==
+      exp8 = chainLevel exp9 8 -- &
+      exp7 = chainLevel exp8 7 -- bit xor
+      exp6 = chainLevel exp7 6 -- bit or
+      exp5 = chainLevel exp6 5 -- &&
+      exp4 = chainLevel exp5 4 -- or
+      exp3 = chainLevel exp4 3 -- ??
+      exp2 = chainLevel exp3 2 -- Assignments
+      exp1 = chainLevel exp2 1 -- comma
+   in exp1
 
 -- >>> parse (many varP) "x y z"
+-- Right [Name "x",Name "y",Name "z"]
 -- >>> parse varP "(x.y[1]).z"
+-- Right (Dot (Var (Element (Var (Dot (Var (Name "x")) "y")) (Lit (NumberLiteral 1)))) "z")
 varP :: Parser Var
-varP = undefined
+varP = P.try (mkVar <$> prefixP <*> some indexP) <|> P.try (Name <$> nameP)
+  where
+    mkVar :: Expression -> [Expression -> Var] -> Var
+    mkVar e l = foldr1 (\f p u -> p (Var (f u))) l e
+
+    prefixP :: Parser Expression
+    prefixP = parens expP <|> Var . Name <$> nameP
+
+    indexP :: Parser (Expression -> Var)
+    indexP =
+      P.try (flip Dot <$> (P.string "." *> nameP))
+        <|> P.try (flip Element <$> brackets expP)
 
 reserved :: [String]
 reserved =
@@ -309,58 +410,102 @@ reserved =
     "of"
   ]
 
--- >>> parse (many nameP) "x sfds _ nil"
--- Right ["x","sfds","_"]
+-- >>> parse (many nameP) "x sfds $test_this he$_lo o9kay _ 9bad from but-not-this"
+-- Right ["x","sfds","$test_this","he$_lo","o9kay","_"]
 nameP :: Parser Name
-nameP = undefined
+nameP =
+  wsP $ do
+    varName <- (:) <$> (P.try P.letterChar <|> P.try (P.char '_') <|> P.try (P.char '$')) <*> many (P.try P.alphaNumChar <|> P.try (P.char '_') <|> P.try (P.char '$'))
+    if varName `elem` reserved
+      then fail "Reserved keyword"
+      else return varName
 
 -- >>> parse (many uopPrefixP) "- - ... --"
--- Left (line 1, column 1):
--- unexpected " "
--- expecting "--"
+-- Right [MinusUop,MinusUop,Spread,DecPre]
 -- >>> parse (many uopPrefixP) "~ \n- -    ! # ++ ... typeof void +++"
--- Left (line 2, column 1):
--- unexpected " "
--- expecting "--"
+-- Right [BitNeg,MinusUop,MinusUop,Not]
 uopPrefixP :: Parser UopPrefix
 uopPrefixP =
   wsP $
-    P.char '!' $> Not
-      <|> P.char '~' $> BitNeg
-      <|> P.string "typeof" $> TypeOf
-      <|> P.string "..." $> Spread
-      <|> P.string "--" $> DecPre
-      <|> P.string "++" $> IncPre
-      <|> P.char '+' $> PlusUop
-      <|> P.char '-' $> MinusUop
-      <|> P.string "void" $> Void
+    P.try (P.char '!' $> Not)
+      <|> P.try (P.char '~' $> BitNeg)
+      <|> P.try (P.string "typeof" $> TypeOf)
+      <|> P.try (P.string "..." $> Spread)
+      <|> P.try (P.string "--" $> DecPre)
+      <|> P.try (P.string "++" $> IncPre)
+      <|> P.try (P.char '+' $> PlusUop)
+      <|> P.try (P.char '-' $> MinusUop)
+      <|> P.try (P.string "void" $> Void)
 
 -- >>> parse (many uopPrefixP) "++   ++ -- ++      --"
--- Right [Neg,Neg,Len]
+-- Right [IncPre,IncPre,DecPre,IncPre,DecPre]
 uopPostfix :: Parser UopPostfix
 uopPostfix =
   wsP $
-    P.string "--" $> DecPost
-      <|> P.string "++" $> IncPost
+    P.try (P.string "--" $> DecPost)
+      <|> P.try (P.string "++" $> IncPost)
 
 -- >>> parse (many bopP) "+ >= .."
--- Right [Plus,Ge,Concat]
+-- Right [PlusBop,Ge]
 -- >>> parse (many bopP) "|| >>= +   <= - //  \n== % * <<===> >"
--- Right [Or,Gt,Ge,Plus,Le,Minus,Divide,Eq,Modulo,Times,Lt,Le,Eq,Gt,Gt]
+-- Right [Or,RightShiftAssign,PlusBop,Le,MinusBop,Div,Div,Eq,Mod,Times,LeftShiftAssign,Eq,Gt,Gt]
 bopP :: Parser Bop
-bopP = undefined
+bopP =
+  P.try . wsP . asum $ -- TODO: do we need to move P.try?
+    [ P.string ">>>" >> ((P.char '=' $> UnsignedRightShiftAssign) <|> pure UnsignedRightShift),
+      P.string ">>" >> ((P.char '=' $> RightShiftAssign) <|> pure RightShift),
+      P.string "<<" >> ((P.char '=' $> LeftShiftAssign) <|> pure LeftShift),
+      P.string "**" >> ((P.char '=' $> ExpAssign) <|> pure Exp),
+      P.string "==" >> ((P.char '=' $> EqStrict) <|> pure Eq),
+      P.string "!=" >> ((P.char '=' $> NeqStrict) <|> pure Neq),
+      P.string "&&" >> ((P.char '=' $> AndAssign) <|> pure And),
+      P.string "||" >> ((P.char '=' $> OrAssign) <|> pure Or),
+      P.string "??" >> ((P.char '=' $> NullishCoalescingAssign) <|> pure NullishCoalescing),
+      P.string "+" >> ((P.char '=' $> PlusAssign) <|> pure PlusBop),
+      P.string "-" >> ((P.char '=' $> MinusAssign) <|> pure MinusBop),
+      P.string "*" >> ((P.char '=' $> TimesAssign) <|> pure Times),
+      P.string "/" >> ((P.char '=' $> DivAssign) <|> pure Div),
+      P.string "%" >> ((P.char '=' $> ModAssign) <|> pure Mod),
+      P.string "&" >> ((P.char '=' $> BitAndAssign) <|> pure BitAnd),
+      P.string "|" >> ((P.char '=' $> BitOrAssign) <|> pure BitOr),
+      P.string "^" >> ((P.char '=' $> BitXorAssign) <|> pure BitXor),
+      P.string "<" >> ((P.char '=' $> Le) <|> pure Lt),
+      P.string ">" >> ((P.char '=' $> Ge) <|> pure Gt),
+      P.string "=" $> Assign,
+      P.string "in" $> In,
+      P.string "instanceof" $> InstanceOf,
+      P.string "," $> Comma
+    ]
 
 constAssignmentP :: Parser Statement
-constAssignmentP = undefined
+constAssignmentP =
+  ConstAssignment
+    <$> (stringP "const" *> varP)
+    <*> (optional (stringP ":" *> typeP) *> stringP "=" *> expP <* optional (stringP ";"))
 
 letAssignmentP :: Parser Statement
-letAssignmentP = undefined
+letAssignmentP =
+  LetAssignment
+    <$> (stringP "let" *> varP)
+    <*> (optional (stringP ":" *> typeP) *> stringP "=" *> expP <* optional (stringP ";")) -- TODO: Support "let x;"
 
-ifP :: Parser Statement
-ifP = undefined
+ifP :: Parser Statement -- TODO: Support else if and if with no else, ifs without braces
+ifP =
+  If
+    <$> (stringP "if" *> parens expP)
+    <*> (braces blockP <* stringP "else")
+    <*> braces blockP
 
 forP :: Parser Statement
-forP = undefined
+forP =
+  For
+    <$> ( stringP "for"
+            *> stringP "("
+            *> (P.try constAssignmentP <|> P.try letAssignmentP)
+        )
+    <*> (expP <* stringP ";")
+    <*> (expP <* stringP ")")
+    <*> braces blockP
 
 whileP :: Parser Statement
 whileP = undefined
@@ -383,6 +528,9 @@ switchP = undefined
 labeledStatementP :: Parser Statement
 labeledStatementP = undefined
 
+functionDeclarationP :: Parser Statement
+functionDeclarationP = undefined
+
 functionCallP :: Parser Statement
 functionCallP = undefined
 
@@ -395,15 +543,17 @@ statementP =
     <|> letAssignmentP
     <|> ifP
     <|> forP
-    <|> whileP
-    <|> breakP
-    <|> continueP
-    <|> tryP
-    <|> returnP
-    <|> switchP
-    <|> labeledStatementP
-    <|> functionCallP
-    <|> emptyP
+
+-- <|> whileP
+-- <|> breakP
+-- <|> continueP
+-- <|> tryP
+-- <|> returnP
+-- <|> switchP
+-- <|> labeledStatementP
+-- <|> functionDeclarationP
+-- <|> functionCallP
+-- <|> emptyP
 
 blockP :: Parser Block
 blockP = Block <$> many statementP
@@ -472,11 +622,11 @@ test_literal =
   "parsing literals"
     ~: TestList
       [ parse
-          (many numberLitP)
+          (many literalP)
           "1 2\n 3"
           ~?= Right [NumberLiteral 1, NumberLiteral 2, NumberLiteral 3],
         parse
-          (many boolLitP)
+          (many literalP)
           "true false\n true"
           ~?= Right
             [ BooleanLiteral True,
@@ -484,21 +634,21 @@ test_literal =
               BooleanLiteral True
             ],
         parse
-          (many nullLitP)
+          (many literalP)
           "null null\n null"
           ~?= Right [NullLiteral, NullLiteral, NullLiteral],
         parse
-          (many undefinedLitP)
+          (many literalP)
           "undefined undefined\n undefined"
           ~?= Right [UndefinedLiteral, UndefinedLiteral, UndefinedLiteral],
-        parse stringLitP "\"a\"" ~?= Right (StringLiteral "a"),
-        parse stringLitP "\"a\\\"\"" ~?= Right (StringLiteral "a\\"),
+        parse literalP "\"a\"" ~?= Right (StringLiteral "a"),
+        parse literalP "\"a\\\"\"" ~?= Right (StringLiteral "a\\"),
         parse
-          (many stringLitP)
+          (many literalP)
           "\"a\"   \"b\""
           ~?= Right [StringLiteral "a", StringLiteral "b"],
         parse
-          (many stringLitP)
+          (many literalP)
           "\" a\"   \"b\""
           ~?= Right [StringLiteral " a", StringLiteral "b"]
       ]
@@ -508,7 +658,7 @@ test_exp =
   "parsing expressions"
     ~: TestList
       [ parse (many varP) "x y z" ~?= Right [Name "x", Name "y", Name "z"],
-        parse (many nameP) "x sfds _ nil" ~?= Right ["x", "sfds", "_"],
+        parse (many nameP) "x sfds _ from" ~?= Right ["x", "sfds", "_"],
         parse (many uopPrefixP) "- - ... --" ~?= Right [MinusUop, MinusUop, Spread, DecPre],
         parse (many bopP) "+ >= ||" ~?= Right [PlusBop, Ge, Or]
       ]
@@ -518,7 +668,7 @@ test_stat =
   "parsing statements"
     ~: TestList
       [ parse statementP "const x = 3" ~?= Right (ConstAssignment (Name "x") (Lit (NumberLiteral 3))),
-        parse statementP "if (x) { let y = undefined } else { const y = null }"
+        parse statementP "if (x) { let y = undefined; } else { const y = null }"
           ~?= Right
             ( If
                 (Var (Name "x"))
@@ -534,7 +684,7 @@ test_stat =
       ]
 
 -- >>> runTestTT test_stat
--- Counts {cases = 5, tried = 5, errors = 0, failures = 0}
+-- Counts {cases = 2, tried = 2, errors = 0, failures = 0}
 
 test_all :: IO Counts
 test_all =
@@ -542,7 +692,7 @@ test_all =
     TestList [test_comb, test_literal, test_exp, test_stat, tParseFiles]
 
 -- >>> test_all
--- Counts {cases = 32, tried = 32, errors = 0, failures = 0}
+-- Counts {cases = 22, tried = 22, errors = 0, failures = 0}
 
 qc :: IO ()
 qc = do

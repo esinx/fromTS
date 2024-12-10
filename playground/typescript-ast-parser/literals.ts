@@ -38,12 +38,12 @@ console.log(typeof nan);
 
 console.log(5 === 5.0);
 
-interface Test1 {
-    test: 5;
-}
+type Test1 = {
+    test: [5.0, 3] & ["test", 4.0[], string];
+};
 
 interface Test2 {
-    test: 5.0;
+    test: 5;
 }
 
 const test1: Test2 = { test: 5 };
@@ -51,3 +51,7 @@ const test1: Test2 = { test: 5 };
 console.log(typeof test1.test); // number
 
 console.log(Infinity === Infinity);
+
+for (5 - 4; ; ) {
+    console.log(test1);
+}

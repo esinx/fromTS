@@ -29,7 +29,7 @@ data TSType
   | TNumberLiteral Double -- 1 (treated as 1.0) or 5.0
   | TString -- string
   | TStringLiteral String -- "hello"
-  | TArray TSType -- Array<T>
+  | TArray TSType -- Array<T> or T[]
   | TTuple TSType TSType -- [T, U]
   | TBracket -- {}
   | TObject -- object
