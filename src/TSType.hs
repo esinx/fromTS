@@ -26,7 +26,7 @@ data TSType
   = TBoolean -- boolean
   | TBooleanLiteral Bool -- true, false
   | TNumber -- number
-  | TNumberLiteral Int -- 1
+  | TNumberLiteral Double -- 1 (treated as 1.0) or 5.0
   | TString -- string
   | TStringLiteral String -- "hello"
   | TArray TSType -- Array<T>

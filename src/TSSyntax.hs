@@ -9,6 +9,7 @@ import Test.HUnit
 import Test.QuickCheck (Arbitrary (..), Gen)
 import Test.QuickCheck qualified as QC
 import Text.PrettyPrint (Doc, (<+>))
+import TSNumber
 import Text.PrettyPrint qualified as PP
 
 newtype Block = Block [Statement] -- s1 ... sn
@@ -57,7 +58,7 @@ data Expression
   deriving (Eq, Show)
 
 data Literal
-  = IntegerLiteral Int -- 1
+  = NumberLiteral Number -- 1 or 5.0 or Infinity or -Infinity or NaN
   | StringLiteral String -- "abd" or 'abd' or `abd`? (support templates later?)
   | BooleanLiteral Bool -- true or false
   | NullLiteral -- null
@@ -171,6 +172,10 @@ instance PP String where
 instance PP Int where
   pp :: Int -> Doc
   pp = PP.int
+
+instance PP Number where
+  pp :: Number -> Doc
+  pp = PP.text . show
 
 -- instance PP TableName where
 --   pp :: TableName -> Doc
@@ -481,16 +486,18 @@ instance Arbitrary Literal where
   arbitrary :: Gen Literal
   arbitrary =
     QC.oneof
-      [ IntegerLiteral <$> arbitrary,
+      [ NumberLiteral <$> arbitrary,
         BooleanLiteral <$> arbitrary,
         pure NullLiteral,
         pure UndefinedLiteral,
         StringLiteral <$> genStringLit
+        -- TODO: add Objects
       ]
 
   shrink :: Literal -> [Literal]
-  shrink (IntegerLiteral n) = IntegerLiteral <$> shrink n
+  shrink (NumberLiteral n) = NumberLiteral <$> shrink n
   shrink (BooleanLiteral b) = BooleanLiteral <$> shrink b
   shrink NullLiteral = []
   shrink UndefinedLiteral = []
   shrink (StringLiteral s) = StringLiteral <$> shrinkStringLit s
+  shrink (ObjectLiteral m) = ObjectLiteral <$> shrink m

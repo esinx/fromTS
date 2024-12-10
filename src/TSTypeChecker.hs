@@ -10,6 +10,7 @@ import Data.List qualified as List
 import Data.Map qualified as Map
 import GHC.IO (unsafePerformIO)
 import TSError
+import TSNumber
 import TSSyntax
 import TSType
 
@@ -122,7 +123,9 @@ isSubtype' t TBracket
 isSubtype' _ _ = False
 
 typeCheckConstLiteral :: Literal -> TSTypeChecker TSType
-typeCheckConstLiteral (IntegerLiteral n) = return $ TNumberLiteral n
+typeCheckConstLiteral (NumberLiteral (Int i)) = return $ TNumberLiteral (fromIntegral i)
+typeCheckConstLiteral (NumberLiteral (Double d)) = return $ TNumberLiteral d
+typeCheckConstLiteral (NumberLiteral _) = return TNumber
 typeCheckConstLiteral (StringLiteral s) = return $ TStringLiteral s
 typeCheckConstLiteral (BooleanLiteral b) = return $ TBooleanLiteral b
 typeCheckConstLiteral (ObjectLiteral m) = do
@@ -132,7 +135,7 @@ typeCheckConstLiteral NullLiteral = return TNull
 typeCheckConstLiteral UndefinedLiteral = return TUndefined
 
 typeCheckLiteral :: Literal -> TSTypeChecker TSType
-typeCheckLiteral (IntegerLiteral _) = return TNumber
+typeCheckLiteral (NumberLiteral _) = return TNumber
 typeCheckLiteral (StringLiteral _) = return TString
 typeCheckLiteral (BooleanLiteral _) = return TBoolean
 typeCheckLiteral (ObjectLiteral m) = do
