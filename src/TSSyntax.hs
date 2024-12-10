@@ -183,20 +183,20 @@ instance PP Number where
 
 instance PP Var where
   pp :: Var -> Doc
-  -- pp (Name n) = PP.text n
-  -- pp (Dot (Var v) k) = pp v <> PP.text "." <> pp k
-  -- pp (Dot t k) = PP.parens (pp t) <> PP.text "." <> pp k
-  -- pp (Proj (Var v) k) = pp v <> PP.brackets (pp k)
-  -- pp (Proj t k) = PP.parens (pp t) <> PP.brackets (pp k)
-  pp _ = undefined
+  pp (Name n) = PP.text n
+  pp (Dot (Var v) k) = pp v <> PP.text "." <> pp k
+  pp (Dot t k) = PP.parens (pp t) <> PP.text "." <> pp k
+  pp (Element (Var v) k) = pp v <> PP.brackets (pp k)
+  pp (Element t k) = PP.parens (pp t) <> PP.brackets (pp k)
 
 instance PP Literal where
   pp :: Literal -> Doc
-  -- pp (IntVal i) = pp i
-  -- pp (BoolVal b) = pp b
-  -- pp NilVal = PP.text "nil"
-  -- pp (StringVal s) = PP.text ("\"" <> s <> "\"")
-  -- pp (TableVal tn) = PP.text "<" <> pp tn <> PP.text ">"
+  pp (NumberLiteral i) = pp i
+  pp (StringLiteral s) = PP.text ("\"" <> s <> "\"")
+  pp (BooleanLiteral b) = pp b
+  pp NullLiteral = PP.text "null"
+  pp UndefinedLiteral = PP.text "undefined"
+  -- pp (ObjectLiteral m) = PP.braces (PP.sep (PP.punctuate PP.comma (map ppa (Map.toList m)))
   pp _ = undefined
 
 isBase :: Expression -> Bool
@@ -208,18 +208,48 @@ isBase _ = False
 
 instance PP Bop where
   pp :: Bop -> Doc
-  -- pp Plus = PP.char '+'
-  -- pp Minus = PP.char '-'
-  -- pp Times = PP.char '*'
-  -- pp Divide = PP.text "//"
-  -- pp Modulo = PP.text "%"
-  -- pp Gt = PP.char '>'
-  -- pp Ge = PP.text ">="
-  -- pp Lt = PP.char '<'
-  -- pp Le = PP.text "<="
-  -- pp Eq = PP.text "=="
-  -- pp Concat = PP.text ".."
-  pp _ = undefined
+  pp Assign = PP.equals
+  pp PlusBop = PP.char '+'
+  pp PlusAssign = PP.text "+="
+  pp MinusBop = PP.char '-'
+  pp MinusAssign = PP.text "-="
+  pp Times = PP.char '*'
+  pp TimesAssign = PP.text "*="
+  pp Div = PP.char '/'
+  pp DivAssign = PP.text "/="
+  pp Mod = PP.char '%'
+  pp ModAssign = PP.text "%="
+  pp Exp = PP.text "**"
+  pp ExpAssign = PP.text "**="
+  pp BitAnd = PP.char '&'
+  pp BitAndAssign = PP.text "&="
+  pp BitOr = PP.char '|'
+  pp BitOrAssign = PP.text "|="
+  pp BitXor = PP.char '^'
+  pp BitXorAssign = PP.text "^="
+  pp LeftShift = PP.text "<<"
+  pp LeftShiftAssign = PP.text "<<="
+  pp RightShift = PP.text ">>"
+  pp RightShiftAssign = PP.text ">>="
+  pp UnsignedRightShift = PP.text ">>>"
+  pp UnsignedRightShiftAssign = PP.text ">>>="
+  pp And = PP.text "&&"
+  pp AndAssign = PP.text "&&="
+  pp Or = PP.text "||"
+  pp OrAssign = PP.text "||="
+  pp NullishCoalescing = PP.text "??"
+  pp NullishCoalescingAssign = PP.text "??="
+  pp Comma = PP.char ','
+  pp Eq = PP.text "=="
+  pp Neq = PP.text "!="
+  pp EqStrict = PP.text "==="
+  pp NeqStrict = PP.text "!=="
+  pp Gt = PP.char '>'
+  pp Ge = PP.text ">="
+  pp Lt = PP.char '<'
+  pp Le = PP.text "<="
+  pp In = PP.text "in"
+  pp InstanceOf = PP.text "instanceof"
 
 instance PP Expression where
   pp :: Expression -> Doc

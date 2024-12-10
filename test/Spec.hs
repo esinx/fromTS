@@ -44,6 +44,7 @@ test_typeChecker :: Test
 test_typeChecker =
   TestList
     [ test_subtyping,
+      test_simplify,
       test_typeCheckExpr,
       test_typeCheckStmt,
       test_typeCheckProg
