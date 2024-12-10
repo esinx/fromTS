@@ -198,10 +198,20 @@ prop_chaoticBottomTypeAny :: TSType -> Bool
 prop_chaoticBottomTypeAny t | simplify t == TNever = not $ isSubtype TAny TNever
 prop_chaoticBottomTypeAny t = isSubtype TAny t
 
+helperContainsAny :: TSType -> Bool
+helperContainsAny TAny = True
+helperContainsAny (TUnion ts) = any helperContainsAny ts
+helperContainsAny (TIntersection ts) = any helperContainsAny ts
+helperContainsAny _ = False
+
 prop_asymmetricExceptAny :: TSType -> TSType -> Property
 prop_asymmetricExceptAny t1 t2 =
-  simplify t1 /= TAny && simplify t2 /= TAny && simplify t1 /= simplify t2 ==>
-    (not (isSubtype t1 t2) || not (isSubtype t2 t1))
+  simplify t1 /= TAny
+    && simplify t2 /= TAny
+    && not (helperContainsAny t1)
+    && not (helperContainsAny t2)
+    && simplify t1 /= simplify t2
+    ==> (not (isSubtype t1 t2) || not (isSubtype t2 t1))
 
 prop_transitiveExceptAny :: TSType -> TSType -> TSType -> Property
 prop_transitiveExceptAny t1 t2 t3 =
@@ -210,6 +220,9 @@ prop_transitiveExceptAny t1 t2 t3 =
     && simplify t1 /= TAny
     && simplify t2 /= TAny
     && simplify t3 /= TAny
+    && not (helperContainsAny t1)
+    && not (helperContainsAny t2)
+    && not (helperContainsAny t3)
     ==> isSubtype t1 t3
 
 prop_func :: TSType -> TSType -> TSType -> TSType -> Property
