@@ -9,6 +9,7 @@ import Test.HUnit
 import Test.QuickCheck (Arbitrary (..), Gen)
 import Test.QuickCheck qualified as QC
 import Text.PrettyPrint (Doc, (<+>))
+import TSNumber
 import Text.PrettyPrint qualified as PP
 
 newtype Block = Block [Statement] -- s1 ... sn
@@ -23,10 +24,10 @@ instance Monoid Block where
   mempty = Block []
 
 data Statement
-  = ConstAssignment Var (Maybe TSType) Expression -- const x : type = e
-  | LetAssignment Var (Maybe TSType) Expression -- let x : type = e
+  = ConstAssignment Var Expression -- const x : type = e
+  | LetAssignment Var Expression -- let x : type = e
   | If Expression Block Block -- if (e) { s1 } else { s2 }
-  | For Expression Expression Expression Block -- for (e1; e2; e3) { s }
+  | For Statement Expression Expression Block -- for (e1; e2; e3) { s }
   | While Expression Block -- while (e) { s }
   | Break
   | Continue
@@ -34,6 +35,12 @@ data Statement
   | Return Expression
   | Switch Expression [(Expression, Block)] -- switch (e) { case e1: s1; ... }
   | LabeledStatement String Statement -- label: s
+  | FunctionDeclaration Expression -- I was thinking of using this as a wrapper of FunctionExpression?
+  -- I think we need some way to parse stuff like this (type annotations and optional parameters + unwrapping):
+  -- type Obj = {
+  --   x: number,
+  --   y?: number
+  -- };
   | FunctionCall Expression -- f(e1, ..., en)
   | Empty -- ';'
   deriving (Eq, Show)
@@ -41,19 +48,23 @@ data Statement
 data Expression
   = Var Var -- global variables x and table indexing
   | Lit Literal -- literal values
+  | AnnotatedExpression TSType Expression -- e : type
   | UnaryOpPrefix UopPrefix Expression -- unary operators
   | UnaryOpPostfix Expression UopPostfix -- unary operators
   | BinaryOp Expression Bop Expression -- binary operators
+  -- I am kind of confused about the [Expression], shouldn't it be statements?
   | FunctionExpression (Maybe String) [Expression] Block -- function (x, y) { s } and (x, y) => s
+  | Array [Expression] -- [e1, ..., en]
   deriving (Eq, Show)
 
 data Literal
-  = IntegerLiteral Int -- 1
+  = NumberLiteral Number -- 1 or 5.0 or Infinity or -Infinity or NaN
   | StringLiteral String -- "abd" or 'abd' or `abd`? (support templates later?)
   | BooleanLiteral Bool -- true or false
   | NullLiteral -- null
   | UndefinedLiteral -- undefined
-  deriving (Eq, Show, Ord)
+  | ObjectLiteral (Map String Expression) -- { x: e1, y: e2 }
+  deriving (Eq, Show)
 
 data UopPrefix
   = Not -- `!` :: a -> Bool
@@ -161,6 +172,10 @@ instance PP String where
 instance PP Int where
   pp :: Int -> Doc
   pp = PP.int
+
+instance PP Number where
+  pp :: Number -> Doc
+  pp = PP.text . show
 
 -- instance PP TableName where
 --   pp :: TableName -> Doc
@@ -471,16 +486,18 @@ instance Arbitrary Literal where
   arbitrary :: Gen Literal
   arbitrary =
     QC.oneof
-      [ IntegerLiteral <$> arbitrary,
+      [ NumberLiteral <$> arbitrary,
         BooleanLiteral <$> arbitrary,
         pure NullLiteral,
         pure UndefinedLiteral,
         StringLiteral <$> genStringLit
+        -- TODO: add Objects
       ]
 
   shrink :: Literal -> [Literal]
-  shrink (IntegerLiteral n) = IntegerLiteral <$> shrink n
+  shrink (NumberLiteral n) = NumberLiteral <$> shrink n
   shrink (BooleanLiteral b) = BooleanLiteral <$> shrink b
   shrink NullLiteral = []
   shrink UndefinedLiteral = []
   shrink (StringLiteral s) = StringLiteral <$> shrinkStringLit s
+  shrink (ObjectLiteral m) = ObjectLiteral <$> shrink m

@@ -32,7 +32,7 @@ common common-stanza
     , random
     , mtl
     , doctest
-    , parsec
+    , megaparsec
     , process
     , bytestring
     , aeson
@@ -47,6 +47,7 @@ library
       common-stanza
   exposed-modules:
       FromTS
+      TSNumber
       TSSyntax
       TSError
       TSParser
