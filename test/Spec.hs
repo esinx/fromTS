@@ -118,9 +118,10 @@ test_typeCheckStmt =
                   (Name "x")
                   (Lit (BooleanLiteral True))
               )
+              ask
           )
           initialTSTypeEnv
-          ~?= Right ()
+          ~?= Right (initialTSTypeEnv {varEnvs = [Map.singleton "x" TBoolean]})
       ]
 
 test_typeCheckProg :: Test
@@ -131,10 +132,13 @@ test_typeCheckProg =
           ( Block
               [ LetAssignment
                   (Name "x")
-                  (Lit (BooleanLiteral True))
+                  (Lit (BooleanLiteral True)),
+                LetAssignment
+                  (Name "y")
+                  (Var (Name "x"))
               ]
           )
-          ~?= Right (Map.singleton "x" TBoolean)
+          ~?= Right (Map.fromList [("x", TBoolean), ("y", TBoolean)])
       ]
 
 -- properties for the typechecker

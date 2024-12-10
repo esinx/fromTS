@@ -8,6 +8,7 @@ import Control.Monad.State qualified as S
 import Data.Functor
 import Data.List qualified as List
 import Data.Map qualified as Map
+import GHC.IO (unsafePerformIO)
 import TSError
 import TSSyntax
 import TSType
@@ -240,21 +241,22 @@ typeCheckExpr :: Expression -> TSTypeChecker TSType
 typeCheckExpr = typeCheckExpr' True
 
 -- | typechecks a statement
-typeCheckStmt :: Statement -> TSTypeChecker ()
-typeCheckStmt (ConstAssignment (Name n) e) = do
+typeCheckStmt :: Statement -> TSTypeChecker TSTypeEnv -> TSTypeChecker TSTypeEnv
+typeCheckStmt (ConstAssignment (Name n) e) comp = do
   t <- typeCheckExpr e
-  putVarEnv n t
-typeCheckStmt (LetAssignment (Name n) e) = do
-  t <- typeCheckExpr' False e
-  putVarEnv n t
-typeCheckStmt _ = undefined
+  putVarEnv n t comp
+typeCheckStmt (LetAssignment (Name n) e) comp =
+  do
+    t <- typeCheckExpr' False e
+    putVarEnv n t comp
+typeCheckStmt _ _ = undefined
 
 -- | typechecks a block
-typeCheckBlock :: Block -> TSTypeChecker ()
-typeCheckBlock (Block []) = return ()
+typeCheckBlock :: Block -> TSTypeChecker TSTypeEnv
+typeCheckBlock (Block []) = do
+  ask
 typeCheckBlock (Block (s : ss)) = do
-  typeCheckStmt s
-  typeCheckBlock (Block ss)
+  typeCheckStmt s (typeCheckBlock (Block ss))
 
 -- | typechecks a program with the initial type environment
 -- and empty variable bindings
@@ -262,11 +264,7 @@ typeCheckProgram ::
   Block ->
   Either Error (Map.Map String TSType)
 typeCheckProgram b = do
-  runReaderT (typeCheckBlock b >> extractTopEnv) initialTSTypeEnv
-  where
-    extractTopEnv = do
-      r <- ask
-      let x = varEnvs r
-      case x of
-        [] -> error "empty env" -- TODO: returning empty instead of throwing error, but this should never happen
-        (env : _) -> return env
+  env <- runReaderT (typeCheckBlock b) initialTSTypeEnv
+  case varEnvs env of
+    [] -> throwError $ TypeError "empty env" -- TODO: returning empty instead of throwing error, but this should never happen
+    currEnv : _ -> return currEnv

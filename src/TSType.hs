@@ -117,47 +117,47 @@ initialTSTypeEnv =
       objectEnv = Map.empty
     }
 
-putVarEnv :: String -> TSType -> TSTypeChecker ()
-putVarEnv name t = do
+putVarEnv :: String -> TSType -> ReaderT TSTypeEnv (Either Error) TSTypeEnv -> TSTypeChecker TSTypeEnv
+putVarEnv name t comp = do
   env <- ask
   case varEnvs env of
     [] -> error "empty env" -- TODO: returning empty instead of throwing error, but this should never happen
     currEnv : envs ->
       if Map.member name currEnv
         then throwError $ TypeError $ "Repeated declaration of: " ++ name
-        else local (\env -> env {varEnvs = Map.insert name t currEnv : envs}) (return ())
+        else local (\env -> env {varEnvs = Map.insert name t currEnv : envs}) comp
 
-updateVarEnv :: String -> TSType -> TSTypeChecker ()
-updateVarEnv name t = do
+updateVarEnv :: String -> TSType -> ReaderT TSTypeEnv (Either Error) TSTypeEnv -> TSTypeChecker TSTypeEnv
+updateVarEnv name t comp = do
   env <- ask
   let update [] = throwError $ TypeError $ "Variable " ++ name ++ " not found in the environment"
       update (currEnv : envs) =
         if Map.member name currEnv
           then
-            local (\env -> env {varEnvs = Map.insert name t currEnv : envs}) (return ())
+            local (\env -> env {varEnvs = Map.insert name t currEnv : envs}) comp
           else do
             update envs
             e <- ask
             let envs' = varEnvs e
-            local (\env -> env {varEnvs = currEnv : envs'}) (return ())
+            local (\env -> env {varEnvs = currEnv : envs'}) comp
   update (varEnvs env)
 
-createNewVarEnv :: TSTypeChecker ()
-createNewVarEnv = do
+createNewVarEnv :: ReaderT TSTypeEnv (Either Error) TSTypeEnv -> TSTypeChecker TSTypeEnv
+createNewVarEnv comp = do
   env <- ask
-  local (\env -> env {varEnvs = Map.empty : varEnvs env}) (return ())
+  local (\env -> env {varEnvs = Map.empty : varEnvs env}) comp
 
-dropVarEnv :: TSTypeChecker ()
-dropVarEnv = do
+dropVarEnv :: ReaderT TSTypeEnv (Either Error) TSTypeEnv -> TSTypeChecker TSTypeEnv
+dropVarEnv comp = do
   env <- ask
   case varEnvs env of
     [] -> error "empty env" -- TODO: returning empty instead of throwing error, but this should never happen
-    _ : envs -> local (\env -> env {varEnvs = envs}) (return ())
+    _ : envs -> local (\env -> env {varEnvs = envs}) comp
 
-updateObjectEnv :: String -> TSType -> TSTypeChecker ()
-updateObjectEnv name t = do
+updateObjectEnv :: String -> TSType -> ReaderT TSTypeEnv (Either Error) TSTypeEnv -> TSTypeChecker TSTypeEnv
+updateObjectEnv name t comp = do
   env <- ask
-  local (\env -> env {objectEnv = Map.insert name t (objectEnv env)}) (return ())
+  local (\env -> env {objectEnv = Map.insert name t (objectEnv env)}) comp
 
 lookupVarType :: String -> TSTypeChecker TSType
 lookupVarType name = do

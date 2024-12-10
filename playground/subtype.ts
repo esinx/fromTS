@@ -188,3 +188,8 @@ const objectttt: object = objecttt
 const varrrr = 1
 const varrrrr = [1, 2, 3]
 varrrr == varrrrr
+
+
+if () {
+    console.log("hi")
+}
