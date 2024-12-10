@@ -1,7 +1,9 @@
 import Control.Monad.Reader
 import Control.Monad.State
 import Control.Monad.State qualified as S
-import Data.Map qualified as Map
+import Data.Aeson qualified as JSON
+import Data.ByteString.Lazy.UTF8 as BLU
+import Data.Map
 import GHC.IO (unsafePerformIO)
 import GHC.IO.Exception (ExitCode (ExitFailure, ExitSuccess))
 import System.Process (readProcessWithExitCode)
@@ -239,9 +241,27 @@ prop_ioDifferential b =
       typeCheckResult = typeCheckProgram b
    in do
         writeFile outputFile $ pretty b
-        result <- readProcessWithExitCode "tsc" [outputFile] ""
+        result <-
+          readProcessWithExitCode
+            "node"
+            ["./model/dist/index.js", outputFile]
+            []
         return $ property $ match result typeCheckResult
   where
-    match (ExitSuccess, _, _) (Right _) = True
+    match :: (ExitCode, String, String) -> Either Error TSGlobalEnv -> Bool
+    match (ExitSuccess, stdout, _) (Right tsEnv) =
+      let typeMap = JSON.decode $ BLU.fromString stdout :: Maybe (Map String String)
+       in case typeMap of
+            Just tm ->
+              let entries = Data.Map.toAscList tsEnv
+               in all
+                    ( \(name, t) ->
+                        case Data.Map.lookup name tm of
+                          -- TODO: Make string to TSType conversion and use Eq instance
+                          Just t' -> show t == t'
+                          Nothing -> False
+                    )
+                    entries
+            Nothing -> False
     match (ExitFailure _, _, _) (Left _) = True
     match _ _ = False
