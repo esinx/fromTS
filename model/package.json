@@ -1,0 +1,17 @@
+{
+	"name": "fromTS-model",
+	"version": "1.0.0",
+	"main": "index.js",
+	"license": "MIT",
+	"scripts": {
+		"build": "tsc"
+	},
+	"dependencies": {
+		"fs": "^0.0.1-security",
+		"typescript": "^5.7.2"
+	},
+	"devDependencies": {
+		"@types/node": "^22.10.1",
+		"tsx": "^4.19.2"
+	}
+}
