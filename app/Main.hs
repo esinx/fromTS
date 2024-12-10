@@ -10,20 +10,29 @@ import System.IO qualified as IO
 import System.IO.Error qualified as IO
 import System.Process (readProcessWithExitCode)
 import TSError qualified
+import TSParser (parseTSFile)
 
 main :: IO ()
 main = do
-  args <- Env.getArgs
-  case args of
-    [filename] -> do
-      result <- fromTSFile filename
-      case result of
-        Right js -> print js
-        Left err -> print err
-    _ -> putStrLn "Usage: fromTS <filename>"
+  -- res <- parseTSFile "./playground/typescript-ast-parser/literals.ts"
+  res <- parseTSFile "./playground/typescript-ast-parser/literals.ts"
+  case res of
+    Right ts -> print ts
+    Left err -> print err
 
-fromTSFile :: String -> IO (Either TSError.Error String)
-fromTSFile filename = do
-  handle <- IO.openFile filename IO.ReadMode
-  str <- IO.hGetContents handle
-  pure $ fromTS str
+-- main :: IO ()
+-- main = do
+--   args <- Env.getArgs
+--   case args of
+--     [filename] -> do
+--       result <- fromTSFile filename
+--       case result of
+--         Right js -> print js
+--         Left err -> print err
+--     _ -> putStrLn "Usage: fromTS <filename>"
+
+-- fromTSFile :: String -> IO (Either TSError.Error String)
+-- fromTSFile filename = do
+--   handle <- IO.openFile filename IO.ReadMode
+--   str <- IO.hGetContents handle
+--   pure $ fromTS str
