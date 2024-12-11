@@ -14,8 +14,8 @@ import TSParser (parseTSFile)
 
 main :: IO ()
 main = do
-  -- res <- parseTSFile "./playground/typescript-ast-parser/literals.ts"
-  res <- parseTSFile "./playground/typescript-ast-parser/literals.ts"
+  -- res <- parseTSFile "./playground/typescript-ast-parser/literals-simple.ts"
+  res <- parseTSFile "./playground/typescript-ast-parser/literals-simple.ts"
   case res of
     Right ts -> print ts
     Left err -> print err

@@ -1,30 +1,7 @@
-// const num = 42;
-// const str = "literal-string";
-// const boolTrue: false = true;
-// const boolFalse: boolean = false;
-// const arrOfNum = [1, 2, 3];
-// const arrOfStr = ["a", "b", "c"];
-// const arrOfBool = [true, false, true];
-// const nullLiteral = null;
-
-// const decimal: number = 42;
-// const decimalFloat = -42.42;
-
-// const binary = 0b101010;
-// const octal: string = -0o52;
-// const hexadecimal = 0x2a;
-
-// const scientific = (((-4.2e1 * 100 ** 2) << 4) / 4.2) | 0b1011101;
-// const scientificNegative = 4.2e-1;
-
-// const infinity = Infinity;
-// const negativeInfinity = -Infinity;
-// const nan = NaN;
-
 const num = 42;
 const str = "literal-string";
-const boolTrue = true;
-const boolFalse = false;
+const boolTrue: false = true;
+const boolFalse: boolean = false;
 const constObj = { key: "value" } as const;
 const obj = { key: "value" };
 const arrOfNum = [1, 2, 3];
@@ -38,11 +15,11 @@ const arrOfArr = [
 const arrOfMixed = [1, "a", true, { key: "value" }, [1, 2, 3]];
 const nullLiteral = null;
 // numbers
-const decimal = 42; // Standard integer
-const decimalFloat = 42.42; // Floating-point
+const decimal: number = 42; // Standard integer
+const decimalFloat = -42.42; // Floating-point
 
 const binary = 0b101010; // 42 in binary
-const octal = 0o52; // 42 in octal
+const octal: string = -0o52; // 42 in octal
 const hexadecimal = 0x2a; // 42 in hexadecimal
 
 // NOT SUPPORTING BIGINT: (not available when targeting lower than ES2020)
@@ -51,60 +28,64 @@ const hexadecimal = 0x2a; // 42 in hexadecimal
 // const bigIntBinary = 0b101010n; // BigInt in binary
 // const bigIntOctal = 0o52n; // BigInt in octal
 
-const scientific = 4.2e1; // 42 in scientific notation
+const scientific = (((-4.2e1 * 100 ** 2) << 4) / 4.2) | 0b1011101;
 const scientificNegative = 4.2e-1; // 0.42
 
 const infinity = Infinity; // Positive infinity
 const negativeInfinity = -Infinity; // Negative infinity
 const nan = NaN; // Not a Number
 
-console.log(
-    decimal,
-    decimalFloat,
-    binary,
-    octal,
-    hexadecimal,
-    scientific,
-    scientificNegative,
-    infinity,
-    negativeInfinity,
-    nan
-);
+// console.log(
+//     decimal,
+//     decimalFloat,
+//     binary,
+//     octal,
+//     hexadecimal,
+//     scientific,
+//     scientificNegative,
+//     infinity,
+//     negativeInfinity,
+//     nan
+// );
 
-console.log(typeof nan);
+// console.log(typeof nan);
 
 // console.log(NaN === NaN); // false? but it's an error
 
-console.log(5 === 5.0);
+// console.log(5 === 5.0);
 
-type Test1 = {
-    test: [5.0, 3] & ["test", 4.0[], string];
-};
+// type Test1 = {
+//     test: [5.0, 3] & ["test", 4.0[], string];
+// };
 
-interface Test2 {
-    test: 5;
-}
+// interface Test2 {
+//     test: 5;
+// }
 
-const test1: Test2 = { test: 5 };
+// const test1: Test2 = { test: 5 };
 
-console.log(typeof test1.test); // number
+// console.log(typeof test1.test); // number
 
-console.log(Infinity === Infinity);
+// console.log(Infinity === Infinity);
 
-console.log(5 / 0);
+// console.log(5 / 0);
 
-for (5 - 4; ; ) {
-    console.log(test1);
-}
-
-for (; x < 10; x++) console.log(x);
+for (let x = 0; x < 10; x++) i = x;
 
 if (true) {
-    console.log("5 == 6");
-} else if (5 - 7 < 21) console.log("why");
+    let val = "5 == 6";
+} else if (5 - 7 < 21) val2 = true;
 
 try {
     5 + 6;
 } catch (a: any) {
-    console.log("finally");
+    const names = ["a", "b", "c"];
 }
+
+// if (true) while (false) for (;;) console.log(":(");
+
+// const fn = () => {
+//     console.log("test");
+// };
+
+// for (fn(); fn(); ) {}
