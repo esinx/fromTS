@@ -112,12 +112,12 @@ isSubtype' _ (TFunction _ _) = False
 -- S1 <: T1       S2 <: T2
 -- ------------------------
 --    S1 * S2 <: T1 * T2
-isSubtype' (TTuple t1 t2) (TTuple u1 u2) = isSubtype' t1 u1 && isSubtype' t2 u2
+isSubtype' (TTuple t1) (TTuple u1) = length t1 == length u1 && all (uncurry isSubtype') (zip t1 u1)
 -- nothing is a subtype of tuples except bottom types
-isSubtype' _ (TTuple _ _) = False
+isSubtype' _ (TTuple _) = False
 -- nothing is a subtype of arrays except bottom types and tuples
 isSubtype' (TArray t1) (TArray t2) = isSubtype' t1 t2
-isSubtype' (TTuple t1 t2) (TArray arrType) = isSubtype' (TUnion [t1, t2]) arrType
+isSubtype' (TTuple t1) (TArray arrType) = isSubtype' (TUnion t1) arrType
 isSubtype' _ (TArray _) = False
 --              n > m
 -- ---------------------------------- (Width Subtyping)
@@ -139,7 +139,7 @@ isSubtype' (TUserObject n) (TUserObject m) =
 isSubtype' _ (TUserObject _) = False
 -- bottom types, function, tuple, array, user objects are subtypes of object
 isSubtype' (TFunction _ _) TObject = True
-isSubtype' (TTuple _ _) TObject = True
+isSubtype' (TTuple _) TObject = True
 isSubtype' (TArray _) TObject = True
 isSubtype' (TUserObject _) TObject = True
 isSubtype' _ TObject = False
