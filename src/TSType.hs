@@ -32,7 +32,7 @@ data TSType
   | TString -- string
   | TStringLiteral String -- "hello"
   | TArray TSType -- Array<T> or T[]
-  | TTuple TSType TSType -- [T, U]
+  | TTuple [TSType] -- [T, U, ...]
   | TBracket -- {}
   | TObject -- object
   | TUserObject (Map String TSType)
@@ -201,7 +201,7 @@ genType n =
       (1, TNumberLiteral <$> arbitrary),
       (1, TStringLiteral <$> genStringLitType),
       (n, TArray <$> genType n'),
-      (n, TTuple <$> genType n' <*> genType n'),
+      (n, TTuple <$> QC.vectorOf 3 (genType n')),
       (n, TUserObject <$> genMap n'),
       (n, TFunction <$> QC.vectorOf 2 (genType n') <*> genType n'),
       (n, TUnion <$> QC.vectorOf 3 (genType n')),
@@ -211,10 +211,12 @@ genType n =
     n' = n `div` 2
 
 instance Arbitrary TSType where
+  arbitrary :: Gen TSType
   arbitrary = QC.sized genType
+
   shrink :: TSType -> [TSType]
   shrink (TArray t) = TArray <$> shrink t
-  shrink (TTuple t u) = TTuple <$> shrink t <*> shrink u
+  shrink (TTuple ts) = TTuple <$> shrink ts
   shrink (TUserObject m) = TUserObject <$> shrink m
   shrink (TFunction ts t) = TFunction <$> shrink ts <*> shrink t
   shrink (TUnion ts) = TUnion <$> shrink ts

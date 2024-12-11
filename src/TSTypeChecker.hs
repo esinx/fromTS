@@ -193,7 +193,6 @@ typeCheckStmt (Return e) toReturn comp = do
     Just t' -> if isSubtype t t' then comp else throwError $ TypeError "type mismatch"
     Nothing -> throwError $ TypeError "cannot return in this context"
 -- TODO: typeCheckStmt (Switch e cases) toReturn comp =, functions
-typeCheckStmt (LabeledStatement _ s) toReturn comp = typeCheckStmt s toReturn comp
 typeCheckStmt Empty _ comp = comp
 typeCheckStmt _ _ _ = undefined
 

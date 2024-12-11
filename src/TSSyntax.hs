@@ -24,17 +24,17 @@ instance Monoid Block where
   mempty = Block []
 
 data Statement
-  = ConstAssignment Var Expression -- const x: type = e
+  = AnyExpression Expression
+  | ConstAssignment Var Expression -- const x: type = e
   | LetAssignment Var Expression -- let x: type = e
-  | If Expression Block Block -- if (e) { s1 } else { s2 }
-  | For Statement Expression Expression Block -- for (e1; e2; e3) { s }
+  | If [(Expression, Block)] Block -- if (e) { s1 } else { s2 }
+  | For Expression Expression Expression Block -- for (e1; e2; e3) { s }
   | While Expression Block -- while (e) { s }
   | Break
   | Continue
   | Try Block Expression Block -- try { s1 } catch (e) { s2 }
   | Return Expression
   | Switch Expression [(Expression, Block)] -- switch (e) { case e1: s1; ... }
-  | LabeledStatement String Statement -- label: s
   | FunctionDeclaration Expression -- I was thinking of using this as a wrapper of FunctionExpression?
   -- I think we need some way to parse stuff like this (type annotations and optional parameters + unwrapping):
   -- type Obj = {
@@ -42,7 +42,7 @@ data Statement
   --   y?: number
   -- };
   | FunctionCall Expression -- f(e1, ..., en)
-  | Empty -- ';'
+  | Empty
   deriving (Eq, Show)
 
 data Expression
@@ -59,7 +59,7 @@ data Expression
 
 data Literal
   = NumberLiteral Number -- 1 or 5.0 or Infinity or -Infinity or NaN
-  | StringLiteral String -- "abd" or 'abd' or `abd`? (support templates later?)
+  | StringLiteral String -- "abd" or 'abd' or `abd` TODO: support templates
   | BooleanLiteral Bool -- true or false
   | NullLiteral -- null
   | UndefinedLiteral -- undefined
@@ -67,68 +67,68 @@ data Literal
   deriving (Eq, Show)
 
 data UopPrefix
-  = Not -- `!` :: a -> Bool
-  | BitNeg -- `~` :: Int -> Int
-  | TypeOf -- `typeof` :: a -> String
-  | Spread -- `...` :: a -> [a]
-  | DecPre -- `--` :: Int -> Int
-  | IncPre -- `++` :: Int -> Int
-  | PlusUop -- `+` :: Int -> Int
-  | MinusUop -- `-` :: Int -> Int
-  | Void -- `void` :: a -> Undefined // TODO: MAKE THESE TYPES MATCH the literals
+  = Not -- `!`
+  | BitNeg -- `~`
+  | TypeOf -- `typeof`
+  | Spread -- `...`
+  | DecPre -- `--`
+  | IncPre -- `++`
+  | PlusUop -- `+`
+  | MinusUop -- `-`
+  | Void -- `void`
   deriving (Eq, Show, Enum, Bounded)
 
 data UopPostfix
-  = DecPost -- `--` :: Int -> Int
-  | IncPost -- `++` :: Int -> Int
+  = DecPost -- `--`
+  | IncPost -- `++`
   deriving (Eq, Show, Enum, Bounded)
 
 data Bop
-  = Assign -- `=` :: a -> a -> a
-  | PlusBop -- `+`  :: Int -> Int -> Int
-  | PlusAssign -- `+=` :: Int -> Int -> Int // TODO: Doesn't need to be Int (e.g. can be string) types wrong
-  | MinusBop -- `-`  :: Int -> Int -> Int
-  | MinusAssign -- `-=` :: Int -> Int -> Int
-  | Times -- `*`  :: Int -> Int -> Int
-  | TimesAssign -- `*=` :: Int -> Int -> Int
-  | Div -- `/` :: Int -> Int -> Int   -- floor division
-  | DivAssign -- `/=` :: Int -> Int -> Int
-  | Mod -- `%`  :: Int -> Int -> Int   -- modulo
-  | ModAssign -- `%=` :: Int -> Int -> Int
-  | Exp -- `**` :: Int -> Int -> Int
-  | ExpAssign -- `**=` :: Int -> Int -> Int
-  | BitAnd -- `&` :: Int -> Int -> Int
-  | BitAndAssign -- `&=` :: Int -> Int -> Int
-  | BitOr -- `|` :: Int -> Int -> Int
-  | BitOrAssign -- `|=` :: Int -> Int -> Int
-  | BitXor -- `^` :: Int -> Int -> Int
-  | BitXorAssign -- `^=` :: Int -> Int -> Int
-  | LeftShift -- `<<` :: Int -> Int -> Int
-  | LeftShiftAssign -- `<<=` :: Int -> Int -> Int
-  | RightShift -- `>>` :: Int -> Int -> Int
-  | RightShiftAssign -- `>>=` :: Int -> Int -> Int
-  | UnsignedRightShift -- `>>>` :: Int -> Int -> Int
-  | UnsignedRightShiftAssign -- `>>>=` :: Int -> Int -> Int
-  | And -- `&&` :: Bool -> Bool -> Bool
-  | AndAssign -- `&&=` :: Bool -> Bool -> Bool
-  | Or -- `||` :: Bool -> Bool -> Bool
-  | OrAssign -- `||=` :: Bool -> Bool -> Bool
-  | NullishCoalescing -- `??` :: a -> a -> a
-  | NullishCoalescingAssign -- `??=` :: a -> a -> a
-  | Comma -- `,` :: a -> a -> a
-  | Eq -- `==` :: a -> a -> Bool
-  | Neq -- `!=` :: a -> a -> Bool
-  | EqStrict -- `===` :: a -> a -> Bool
-  | NeqStrict -- `!==` :: a -> a -> Bool
-  | Gt -- `>`  :: a -> a -> Bool
-  | Ge -- `>=` :: a -> a -> Bool
-  | Lt -- `<`  :: a -> a -> Bool
-  | Le -- `<=` :: a -> a -> Bool
-  | In -- `in` :: a -> a -> Bool
-  | InstanceOf -- `instanceof` :: a -> a -> Bool
+  = Assign -- `=`
+  | PlusBop -- `+`
+  | PlusAssign -- `+=`
+  | MinusBop -- `-`
+  | MinusAssign -- `-=`
+  | Times -- `*`
+  | TimesAssign -- `*=`
+  | Div -- `/`
+  | DivAssign -- `/=`
+  | Mod -- `%`
+  | ModAssign -- `%=`
+  | Exp -- `**`
+  | ExpAssign -- `**=`
+  | BitAnd -- `&`
+  | BitAndAssign -- `&=`
+  | BitOr -- `|`
+  | BitOrAssign -- `|=`
+  | BitXor -- `^`
+  | BitXorAssign -- `^=`
+  | LeftShift -- `<<`
+  | LeftShiftAssign -- `<<=`
+  | RightShift -- `>>`
+  | RightShiftAssign -- `>>=`
+  | UnsignedRightShift -- `>>>`
+  | UnsignedRightShiftAssign -- `>>>=`
+  | And -- `&&`
+  | AndAssign -- `&&=`
+  | Or -- `||`
+  | OrAssign -- `||=`
+  | NullishCoalescing -- `??`
+  | NullishCoalescingAssign -- `??=`
+  | Comma -- `,`
+  | Eq -- `==`
+  | Neq -- `!=`
+  | EqStrict -- `===`
+  | NeqStrict -- `!==`
+  | Gt -- `>`
+  | Ge -- `>=`
+  | Lt -- `<`
+  | Le -- `<=`
+  | In -- `in`
+  | InstanceOf -- `instanceof`
   deriving (Eq, Show, Enum, Bounded)
 
-type Name = String -- either the name of a variable or the name of a field
+type Name = String
 
 data Var
   = Name Name -- x, global variable
@@ -172,10 +172,6 @@ instance PP Number where
   pp :: Number -> Doc
   pp = PP.text . show
 
--- instance PP TableName where
---   pp :: TableName -> Doc
---   pp (TN x) = PP.text x
-
 instance PP Var where
   pp :: Var -> Doc
   pp (Name n) = PP.text n
@@ -204,7 +200,7 @@ instance PP TSType where
   pp TString = PP.text "string"
   pp (TStringLiteral s) = pp s
   pp (TArray t) = pp t <> PP.text "[]"
-  pp (TTuple t u) = PP.text "[" <> pp t <> PP.text ", " <> pp u <> PP.text "]"
+  pp (TTuple ts) = PP.brackets (PP.hcat (PP.punctuate PP.comma (map pp ts)))
   pp TBracket = PP.text "{}"
   pp TObject = PP.text "object"
   pp (TUserObject m) = undefined
@@ -331,12 +327,53 @@ ppSS ss = PP.vcat (map pp ss)
 
 instance PP Statement where
   pp :: Statement -> Doc
+  pp (AnyExpression e) = pp e
   pp (ConstAssignment v e) = PP.text "const" <+> pp v <+> PP.equals <+> pp e
   pp (LetAssignment v e) = PP.text "let" <+> pp v <+> PP.equals <+> pp e
-  pp (If guard b1 b2) =
-    PP.hang (PP.text "if" <+> PP.parens (pp guard) <+> PP.char '{') 2 (pp b1)
-      PP.$$ PP.nest 2 (PP.text "} else {" PP.$$ pp b2)
+  pp (If [] elseBlock) =
+    PP.text "if (false) {} else {"
+      PP.$$ PP.nest 2 (pp elseBlock)
       PP.$$ PP.char '}'
+  pp (If ((cond, block) : rest) elseBlock) =
+    ppIfChain (cond, block) rest elseBlock
+    where
+      ppIfChain :: (Expression, Block) -> [(Expression, Block)] -> Block -> Doc
+      ppIfChain (c, b) [] elseBlk =
+        -- No more conditions, just print if and optional else
+        PP.hang (PP.text "if" <+> PP.parens (pp c) <+> PP.char '{') 2 (pp b)
+          PP.$$ PP.char '}'
+            <> ( if not (isEmptyBlock elseBlk)
+                   then
+                     PP.text " else {"
+                       PP.$$ PP.nest 2 (pp elseBlk)
+                       PP.$$ PP.char '}'
+                   else PP.empty
+               )
+      ppIfChain (c, b) ((c2, b2) : xs) elseBlk =
+        -- Still have more conditions, print `if` then chain `else if`s
+        PP.hang (PP.text "if" <+> PP.parens (pp c) <+> PP.char '{') 2 (pp b)
+          PP.$$ PP.char '}'
+            <> PP.text " else"
+            <> PP.hang (PP.text "if" <+> PP.parens (pp c2) <+> PP.char '{') 2 (pp b2)
+          PP.$$ PP.char '}'
+            <> ppElseIfChain xs elseBlk
+
+      ppElseIfChain :: [(Expression, Block)] -> Block -> Doc
+      ppElseIfChain [] elseBlk =
+        if not (isEmptyBlock elseBlk)
+          then
+            PP.text " else {"
+              PP.$$ PP.nest 2 (pp elseBlk)
+              PP.$$ PP.char '}'
+          else PP.empty
+      ppElseIfChain ((c, b) : xs) elseBlk =
+        PP.text " else"
+          <> PP.hang (PP.text "if" <+> PP.parens (pp c) <+> PP.char '{') 2 (pp b)
+          PP.$$ PP.char '}'
+            <> ppElseIfChain xs elseBlk
+
+      isEmptyBlock :: Block -> Bool
+      isEmptyBlock b = pp b == PP.empty
   pp (For init guard update b) =
     PP.hang (PP.text "for" <+> PP.parens (pp init <> (PP.semi <+> (pp guard <> (PP.semi <+> pp update)))) <+> PP.char '{') 2 (pp b)
       PP.$$ PP.char '}'
@@ -355,11 +392,10 @@ instance PP Statement where
     PP.hang (PP.text "switch" <+> PP.parens (pp e) <+> PP.char '{') 2 (PP.vcat (map ppc cases))
       PP.$$ PP.char '}'
     where
-      ppc (e, b) = PP.text "case" <+> (pp e <> (PP.char ':' <+> pp b))
-  pp (LabeledStatement s st) = PP.text s <> (PP.char ':' <+> pp st)
+      ppc (e, b) = PP.text "case" <+> (pp e <> (PP.colon <+> pp b))
   pp (FunctionDeclaration e) = undefined
   pp (FunctionCall e) = undefined
-  pp Empty = PP.semi
+  pp Empty = PP.empty
 
 level :: Bop -> Int
 level b = case b of
@@ -405,19 +441,6 @@ level b = case b of
   Div -> 13
   Mod -> 13
   Exp -> 14
-
--- instance (PP a) => PP (Map Value a) where
---   pp :: (PP a) => Map Value a -> Doc
---   pp m = PP.braces (PP.vcat (map ppa (Map.toList m)))
---     where
---       ppa (StringVal s, v2) = PP.text s <+> PP.text "=" <+> pp v2
---       ppa (v1, v2) = PP.brackets (pp v1) <+> PP.text "=" <+> pp v2
-
--- instance (PP a) => PP (Map TableName a) where
---   pp :: (PP a) => Map TableName a -> Doc
---   pp m = PP.braces (PP.vcat (map ppa (Map.toList m)))
---     where
---       ppa (s, v2) = pp s <+> PP.text "=" <+> pp v2
 
 -- >>> pretty ((Block [ConstAssignment (Name "num") (Lit (NumberLiteral 42)),ConstAssignment (Name "str") (Lit (StringLiteral "literal-string")),ConstAssignment (Name "boolTrue") (Lit (BooleanLiteral True)),ConstAssignment (Name "boolFalse") (Lit (BooleanLiteral False)),ConstAssignment (Name "arrOfNum") (Array [BinaryOp (BinaryOp (Lit (NumberLiteral 1)) Comma (Lit (NumberLiteral 2))) Comma (Lit (NumberLiteral 3))]),ConstAssignment (Name "arrOfStr") (Array [BinaryOp (BinaryOp (Lit (StringLiteral "a")) Comma (Lit (StringLiteral "b"))) Comma (Lit (StringLiteral "c"))]),ConstAssignment (Name "arrOfBool") (Array [BinaryOp (BinaryOp (Lit (BooleanLiteral True)) Comma (Lit (BooleanLiteral False))) Comma (Lit (BooleanLiteral True))]),ConstAssignment (Name "nullLiteral") (Lit NullLiteral),ConstAssignment (Name "decimal") (Lit (NumberLiteral 42)),ConstAssignment (Name "decimalFloat") (UnaryOpPrefix MinusUop (Lit (NumberLiteral 42.42))),ConstAssignment (Name "binary") (Lit (NumberLiteral 42)),ConstAssignment (Name "octal") (UnaryOpPrefix MinusUop (Lit (NumberLiteral 42))),ConstAssignment (Name "hexadecimal") (Lit (NumberLiteral 42)),ConstAssignment (Name "scientific") (BinaryOp (BinaryOp (BinaryOp (BinaryOp (UnaryOpPrefix MinusUop (Lit (NumberLiteral 42.0))) Times (BinaryOp (Lit (NumberLiteral 100)) Exp (Lit (NumberLiteral 2)))) LeftShift (Lit (NumberLiteral 4))) Div (Lit (NumberLiteral 4.2))) BitOr (Lit (NumberLiteral 93))),ConstAssignment (Name "scientificNegative") (Lit (NumberLiteral 0.42000000000000004)),ConstAssignment (Name "infinity") (Lit (NumberLiteral Infinity)),ConstAssignment (Name "negativeInfinity") (UnaryOpPrefix MinusUop (Lit (NumberLiteral Infinity))),ConstAssignment (Name "nan") (Lit (NumberLiteral NaN))]))
 -- "const num = 42\nconst str = \"literal-string\"\nconst boolTrue = true\nconst boolFalse = false\nconst arrOfNum = [1, 2, 3]\nconst arrOfStr = [\"a\", \"b\", \"c\"]\nconst arrOfBool = [true, false, true]\nconst nullLiteral = null\nconst decimal = 42\nconst decimalFloat = -42.42\nconst binary = 42\nconst octal = -42\nconst hexadecimal = 42\nconst scientific = (-42 * 100 ** 2 << 4) / 4.2 | 93\nconst scientificNegative = 0.42000000000000004\nconst infinity = Infinity\nconst negativeInfinity = -Infinity\nconst nan = NaN"
@@ -522,24 +545,20 @@ genBlock n = Block <$> genStmts n
       where
         n' = n `div` 2
 
--- instance Arbitrary TableName where
---   arbitrary :: Gen TableName
---   arbitrary = QC.elements [TN "_", TN "_G", TN "_x", TN "_t1"]
-
 instance Arbitrary Var where
   arbitrary :: Gen Var
   arbitrary = QC.sized genVar
+
   shrink :: Var -> [Var]
-  -- shrink (Name n) = []
-  -- shrink (Proj e1 e2) =
-  --   [Proj e1' e2 | e1' <- shrink e1]
-  --     ++ [Proj e1 e2' | e2' <- shrink e2]
-  -- shrink (Dot e n) = [Dot e' n | e' <- shrink e]
-  shrink _ = undefined
+  shrink (Name n) = []
+  shrink (Element e1 e2) =
+    [Element e1' e2 | e1' <- shrink e1] ++ [Element e1 e2' | e2' <- shrink e2]
+  shrink (Dot e n) = [Dot e' n | e' <- shrink e]
 
 instance Arbitrary Statement where
   arbitrary :: Gen Statement
   arbitrary = QC.sized genStatement
+
   shrink :: Statement -> [Statement]
   -- shrink (Assign v e) =
   --   [Assign v' e | v' <- shrink v]
@@ -591,15 +610,20 @@ instance Arbitrary Expression where
   arbitrary = QC.sized genExp
 
   shrink :: Expression -> [Expression]
-  -- shrink (Val v) = Val <$> shrink v
-  -- shrink (Var v) = Var <$> shrink v
-  -- shrink (Op1 o e) = e : [Op1 o e' | e' <- shrink e]
-  -- shrink (Op2 e1 o e2) =
-  --   [Op2 e1' o e2 | e1' <- shrink e1]
-  --     ++ [Op2 e1 o e2' | e2' <- shrink e2]
-  --     ++ [e1, e2]
-  -- shrink (TableConst fs) = concatMap getExp fs ++ (TableConst <$> shrink fs)
-  shrink _ = undefined
+  shrink (Var v) = Var <$> shrink v
+  shrink (Lit l) = Lit <$> shrink l
+  shrink (AnnotatedExpression t e) =
+    e
+      : [AnnotatedExpression t' e | t' <- shrink t]
+      ++ [AnnotatedExpression t e' | e' <- shrink e]
+  shrink (UnaryOpPrefix o e) = e : [UnaryOpPrefix o e' | e' <- shrink e]
+  shrink (UnaryOpPostfix e o) = e : [UnaryOpPostfix e' o | e' <- shrink e]
+  shrink (BinaryOp e1 o e2) =
+    [BinaryOp e1' o e2 | e1' <- shrink e1]
+      ++ [BinaryOp e1 o e2' | e2' <- shrink e2]
+      ++ [e1, e2]
+  shrink (FunctionExpression n es b) = undefined -- TODO: finish this
+  shrink (Array es) = Array <$> shrink es
 
 instance Arbitrary UopPrefix where
   arbitrary :: Gen UopPrefix

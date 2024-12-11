@@ -93,6 +93,10 @@ console.log(Infinity === Infinity);
 
 console.log(5 / 0);
 
-// for (5 - 4; ; ) {
-//     console.log(test1);
-// }
+for (5 - 4; ; ) {
+    console.log(test1);
+}
+
+for (; x < 10; x++) {
+    console.log(x);
+}
