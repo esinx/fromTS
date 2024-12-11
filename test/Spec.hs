@@ -259,7 +259,9 @@ prop_ioDifferential b =
                in all
                     ( \(name, t) ->
                         case Map.lookup name tm of
-                          Just t' -> parse typeP t' == Right t
+                          Just t' -> case parse typeP t' of
+                            Right t'' -> t =.= t''
+                            Left _ -> False
                           Nothing -> False
                     )
                     entries

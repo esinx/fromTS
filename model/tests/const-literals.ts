@@ -1,3 +1,10 @@
+// const a = null + ""
+// const b = 1 + ""
+// const c = 1 + 2
+// const d = +false
+// const e = +{}
+// const f = +[]
+// const x = {}
 const num = 42
 const str = "literal-string"
 const boolTrue = true

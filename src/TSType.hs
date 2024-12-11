@@ -6,11 +6,13 @@ import Control.Monad.Reader
 import Control.Monad.State
 import Control.Monad.State qualified as S
 import Data.Char qualified as Char
+import Data.List qualified as List
 import Data.Map (Map)
 import Data.Map qualified as Map
 import TSError
 import Test.QuickCheck (Arbitrary (..), Gen)
 import Test.QuickCheck qualified as QC
+import Prelude
 
 type TSVarEnv = [Map String TSType]
 
@@ -44,6 +46,117 @@ data TSType
   | TUnion [TSType]
   | TIntersection [TSType]
   deriving (Show, Eq, Ord)
+
+(=.=) :: TSType -> TSType -> Bool
+(=.=) t1 t2 = t1 `isSubtype` t2 && t2 `isSubtype` t1
+
+-- | for equivalence
+simplify :: TSType -> TSType
+-- {} | null | undefined = unknown
+simplify (TUnion ts) | List.sort ts == List.sort [TBracket, TNull, TUndefined] = TUnknown
+simplify (TIntersection ts) | TNever `elem` ts = TNever
+simplify (TUnion ts) = simplifyUnions (TUnion ts) False
+  where
+    -- TODO: there might be other types that are equivalent to some union types
+    simplifyUnions (TUnion ts) False = simplifyUnions (TUnion $ List.sort $ List.nub $ map simplify ts) True
+    simplifyUnions (TUnion [t]) _ = simplify t
+    simplifyUnions t _ = t
+simplify (TIntersection ts) = simplifyIntersections (TIntersection ts) False
+  where
+    simplifyIntersections (TIntersection ts) False = simplifyIntersections (TIntersection $ List.sort $ List.nub $ map simplify ts) True
+    simplifyIntersections (TIntersection [t]) _ = simplify t
+    simplifyIntersections t _ = t
+simplify t = t
+
+isSubtype :: TSType -> TSType -> Bool
+isSubtype t1 t2 = isSubtype' (simplify t1) (simplify t2)
+
+-- | checks if a type is a subtype of another type
+isSubtype' :: TSType -> TSType -> Bool
+-- reflexivity
+isSubtype' t1 t2 | t1 == t2 = True
+-- union
+isSubtype' (TUnion ts) t = all (`isSubtype'` t) ts
+isSubtype' t (TUnion ts) = any (isSubtype' t) ts
+-- intersection
+isSubtype' (TIntersection ts) t = any (`isSubtype'` t) ts
+isSubtype' t (TIntersection ts) = all (isSubtype' t) ts
+-- proper bottom type
+isSubtype' TNever _ = True
+-- proper top type
+isSubtype' _ TUnknown = True
+-- chaotic top/ bottom type
+isSubtype' _ TAny = True
+isSubtype' TAny TNever = False
+isSubtype' TAny _ = True
+-- nothing is a subtype of null except bottom types
+isSubtype' _ TNull = False
+-- nothing is a subtype of undefined except bottom types
+isSubtype' _ TUndefined = False
+-- nothing is a subtype of void except bottom types and undefined
+isSubtype' TUndefined TVoid = True
+isSubtype' _ TVoid = False
+-- nothing is a subtype of literal types except bottom types
+isSubtype' _ (TStringLiteral _) = False
+isSubtype' _ (TNumberLiteral _) = False
+isSubtype' _ (TBooleanLiteral _) = False
+-- T1 <: S1       S2 <: T2
+-- ----------------------
+--    S1 → S2 <: T1 → T2
+isSubtype' (TFunction args1 ret1) (TFunction args2 ret2) =
+  length args1 <= length args2 -- contravariant
+    && all (uncurry isSubtype') (zip args2 args1)
+    && isSubtype' ret1 ret2
+-- nothing is a subtype of functions except bottom types
+isSubtype' _ (TFunction _ _) = False
+-- S1 <: T1       S2 <: T2
+-- ------------------------
+--    S1 * S2 <: T1 * T2
+isSubtype' (TTuple t1) (TTuple u1) = length t1 == length u1 && all (uncurry isSubtype') (zip t1 u1)
+-- nothing is a subtype of tuples except bottom types
+isSubtype' _ (TTuple _) = False
+-- nothing is a subtype of arrays except bottom types and tuples
+isSubtype' (TArray t1) (TArray t2) = isSubtype' t1 t2
+isSubtype' (TTuple t1) (TArray arrType) = isSubtype' (TUnion t1) arrType
+isSubtype' _ (TArray _) = False
+--              n > m
+-- ---------------------------------- (Width Subtyping)
+-- {i1:T1...in:Tn} <: {i1:T1...im:Tm}
+--      S1 <: T1  ...  Sn <: Tn
+-- ---------------------------------- (Depth Subtyping)
+-- {i1:S1...in:Sn} <: {i1:T1...in:Tn}
+-- object 1's fields is a permutation of fields in object 2
+isSubtype' (TUserObject n) (TUserObject m) =
+  length n >= length m
+    && all
+      ( \(mKey, mType) ->
+          case Map.lookup mKey n of
+            Just nType -> isSubtype' nType mType
+            Nothing -> False
+      )
+      (Map.toList m)
+-- nothing is a subtype of user objects except bottom types
+isSubtype' _ (TUserObject _) = False
+-- bottom types, function, tuple, array, user objects are subtypes of object
+isSubtype' (TFunction _ _) TObject = True
+isSubtype' (TTuple _) TObject = True
+isSubtype' (TArray _) TObject = True
+isSubtype' (TUserObject _) TObject = True
+isSubtype' _ TObject = False
+-- bottom types, string literal are subtypes of string
+isSubtype' (TStringLiteral _) TString = True
+isSubtype' _ TString = False
+-- bottom types, number literal are subtypes of number
+isSubtype' (TNumberLiteral _) TNumber = True
+isSubtype' _ TNumber = False
+-- bottom types, boolean literal are subtypes of boolean
+isSubtype' (TBooleanLiteral _) TBoolean = True
+isSubtype' _ TBoolean = False
+-- everything except null, void, undefined, unknown are subtypes of bracket
+isSubtype' t TBracket
+  | t == TNull || t == TVoid || t == TUndefined || t == TUnknown = False
+  | otherwise = True
+isSubtype' _ _ = False
 
 -- coupling: TSSyntax, to avoid circular dependencies
 
