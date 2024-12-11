@@ -251,7 +251,7 @@ typeP =
     <|> TStringLiteral <$> stringValP
     <|> TString <$ stringP "string"
     <|> TArray <$> arrayTypeP
-    <|> TUnion <$> tupleP -- TODO: FIX TUPLES
+    <|> TTuple <$> tupleP
     <|> TUnknown <$ stringP "unknown"
     <|> TAny <$ stringP "any"
     <|> TNever <$ stringP "never"
@@ -410,12 +410,15 @@ reserved =
     "of"
   ]
 
+nameCharP :: Parser Char
+nameCharP = P.try P.alphaNumChar <|> P.try (P.char '_') <|> P.try (P.char '$')
+
 -- >>> parse (many nameP) "x sfds $test_this he$_lo o9kay _ 9bad from but-not-this"
 -- Right ["x","sfds","$test_this","he$_lo","o9kay","_"]
 nameP :: Parser Name
 nameP =
   wsP $ do
-    varName <- (:) <$> (P.try P.letterChar <|> P.try (P.char '_') <|> P.try (P.char '$')) <*> many (P.try P.alphaNumChar <|> P.try (P.char '_') <|> P.try (P.char '$'))
+    varName <- (:) <$> (P.try P.letterChar <|> P.try (P.char '_') <|> P.try (P.char '$')) <*> many nameCharP
     if varName `elem` reserved
       then fail "Reserved keyword"
       else return varName
@@ -429,13 +432,13 @@ uopPrefixP =
   wsP $
     P.try (P.char '!' $> Not)
       <|> P.try (P.char '~' $> BitNeg)
-      <|> P.try (P.string "typeof" $> TypeOf)
+      <|> P.try (P.string "typeof" <* P.notFollowedBy nameCharP $> TypeOf)
       <|> P.try (P.string "..." $> Spread)
       <|> P.try (P.string "--" $> DecPre)
       <|> P.try (P.string "++" $> IncPre)
       <|> P.try (P.char '+' $> PlusUop)
       <|> P.try (P.char '-' $> MinusUop)
-      <|> P.try (P.string "void" $> Void)
+      <|> P.try (P.string "void" <* P.notFollowedBy nameCharP $> Void)
 
 -- >>> parse (many uopPrefixP) "++   ++ -- ++      --"
 -- Right [IncPre,IncPre,DecPre,IncPre,DecPre]
@@ -472,8 +475,8 @@ bopP =
       P.string "<" >> ((P.char '=' $> Le) <|> pure Lt),
       P.string ">" >> ((P.char '=' $> Ge) <|> pure Gt),
       P.string "=" $> Assign,
-      P.string "in" $> In,
-      P.string "instanceof" $> InstanceOf,
+      P.string "in" <* P.notFollowedBy nameCharP $> In,
+      P.string "instanceof" <* P.notFollowedBy nameCharP $> InstanceOf,
       P.string "," $> Comma
     ]
 
