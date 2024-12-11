@@ -97,6 +97,14 @@ for (5 - 4; ; ) {
     console.log(test1);
 }
 
-for (; x < 10; x++) {
-    console.log(x);
+for (; x < 10; x++) console.log(x);
+
+if (true) {
+    console.log("5 == 6");
+} else if (5 - 7 < 21) console.log("why");
+
+try {
+    5 + 6;
+} catch (a: any) {
+    console.log("finally");
 }

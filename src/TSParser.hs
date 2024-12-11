@@ -481,55 +481,118 @@ bopP =
     ]
 
 constAssignmentP :: Parser Statement
-constAssignmentP =
-  ConstAssignment
-    <$> (stringP "const" *> varP)
-    <*> (optional (stringP ":" *> typeP) *> stringP "=" *> expP <* optional (stringP ";"))
+constAssignmentP = P.try $ do
+  _ <- stringP "const"
+  v <- varP
+  mbType <- optional (stringP ":" *> typeP)
+  _ <- stringP "="
+  e <- expP
+  let finalExpr = case mbType of
+        Nothing -> e
+        Just t -> AnnotatedExpression t e
+  return (ConstAssignment v finalExpr)
 
+-- TODO: Support "let x;" and "let x: number;"
 letAssignmentP :: Parser Statement
-letAssignmentP =
-  LetAssignment
-    <$> (stringP "let" *> varP)
-    <*> (optional (stringP ":" *> typeP) *> stringP "=" *> expP <* optional (stringP ";")) -- TODO: Support "let x;"
+letAssignmentP = P.try $ do
+  _ <- stringP "let"
+  v <- varP
+  mbType <- optional (stringP ":" *> typeP)
+  _ <- stringP "="
+  e <- expP
+  let finalExpr = case mbType of
+        Nothing -> e
+        Just t -> AnnotatedExpression t e
+  return (LetAssignment v finalExpr)
 
-ifP :: Parser Statement -- TODO: Support else if and if with no else, ifs without braces
-ifP =
-  If
-    <$> (stringP "if" *> parens expP)
-    <*> (braces blockP <* stringP "else")
-    <*> braces blockP
+blockOrStmtP :: Parser Block
+blockOrStmtP =
+  P.try (braces blockP)
+    <|> P.try (Block . (: []) <$> statementP)
+
+ifP :: Parser Statement
+ifP = P.try $ do
+  -- Parse initial 'if (...)'
+  stringP "if"
+  cond <- parens expP
+  ifBlock <- blockOrStmtP
+
+  -- Parse zero or more 'else if (...)' clauses
+  elseIfs <- many $ do
+    stringP "else"
+    stringP "if"
+    c <- parens expP
+    b <- blockOrStmtP
+    return (c, b)
+
+  -- Parse optional 'else'
+  elseBlock <- P.option (Block []) $ do
+    stringP "else"
+    blockOrStmtP
+
+  return (If ((cond, ifBlock) : elseIfs) elseBlock)
+
+-- TODO: support `for (;;) {}` (e.g. empty expressions/statements)
+forAssignmentP :: Parser Statement
+forAssignmentP =
+  P.try constAssignmentP
+    <|> P.try letAssignmentP
+    <|> P.try (AnyExpression <$> expP)
 
 forP :: Parser Statement
 forP =
-  For
-    <$> ( stringP "for"
-            *> stringP "("
-            *> (P.try constAssignmentP <|> P.try letAssignmentP)
-        )
-    <*> (expP <* stringP ";")
-    <*> (expP <* stringP ")")
-    <*> braces blockP
+  P.try $
+    For
+      <$> ( stringP "for"
+              *> stringP "("
+              *> forAssignmentP
+              <* stringP ";"
+          )
+      <*> (expP <* stringP ";")
+      <*> (expP <* stringP ")")
+      <*> blockOrStmtP
 
 whileP :: Parser Statement
-whileP = undefined
+whileP = P.try $ While <$> (stringP "while" *> parens expP) <*> blockOrStmtP
 
 breakP :: Parser Statement
-breakP = undefined
+breakP = P.try $ Break <$ wsP (P.string "break" <* P.notFollowedBy nameCharP)
 
 continueP :: Parser Statement
-continueP = undefined
+continueP = P.try $ Continue <$ wsP (P.string "continue" <* P.notFollowedBy nameCharP)
 
 tryP :: Parser Statement
-tryP = undefined
+tryP = P.try $ do
+  _ <- stringP "try"
+  b1 <- braces blockP
+
+  (mbE, b2, b3) <-
+    -- Attempt to parse catch + optional finally
+    P.try
+      ( do
+          _ <- stringP "catch"
+          _ <- stringP "("
+          e <- expP
+          _ <- stringP ")"
+          cblock <- braces blockP
+          fblock <- P.option (Block []) (stringP "finally" *> braces blockP)
+          return (Just e, cblock, fblock)
+      )
+      <|>
+      -- If no catch, try finally
+      P.try
+        ( do
+            fblock <- stringP "finally" *> braces blockP
+            return (Nothing, Block [], fblock)
+        )
+
+  return (Try b1 mbE b2 b3)
 
 returnP :: Parser Statement
-returnP = undefined
-
-switchP :: Parser Statement
-switchP = undefined
-
-labeledStatementP :: Parser Statement
-labeledStatementP = undefined
+returnP = P.try $ do
+  _ <- stringP "return"
+  e <- P.option Nothing (Just <$> expP)
+  return (Return e)
 
 functionDeclarationP :: Parser Statement
 functionDeclarationP = undefined
@@ -542,21 +605,19 @@ emptyP = Empty <$ stringP ";"
 
 statementP :: Parser Statement
 statementP =
-  constAssignmentP
-    <|> letAssignmentP
-    <|> ifP
-    <|> forP
-
--- <|> whileP
--- <|> breakP
--- <|> continueP
--- <|> tryP
--- <|> returnP
--- <|> switchP
--- <|> labeledStatementP
--- <|> functionDeclarationP
--- <|> functionCallP
--- <|> emptyP
+  P.try (AnyExpression <$> expP <* stringP ";")
+    <|> P.try (constAssignmentP <* stringP ";")
+    <|> P.try (letAssignmentP <* stringP ";")
+    <|> P.try (ifP <* stringP ";")
+    <|> P.try (forP <* stringP ";")
+    <|> P.try (whileP <* stringP ";")
+    <|> P.try (breakP <* stringP ";")
+    <|> P.try (continueP <* stringP ";")
+    <|> P.try (tryP <* stringP ";")
+    <|> P.try (returnP <* stringP ";")
+    -- <|> P.try (functionDeclarationP <* stringP ";")
+    -- <|> P.try (functionCallP <* stringP ";")
+    <|> P.try emptyP
 
 blockP :: Parser Block
 blockP = Block <$> many statementP
@@ -674,16 +735,12 @@ test_stat =
         parse statementP "if (x) { let y = undefined; } else { const y = null }"
           ~?= Right
             ( If
-                (Var (Name "x"))
-                (Block [LetAssignment (Name "y") (Lit UndefinedLiteral)])
+                [ ( Var (Name "x"),
+                    Block [LetAssignment (Name "y") (Lit UndefinedLiteral)]
+                  )
+                ]
                 (Block [ConstAssignment (Name "y") (Lit NullLiteral)])
             )
-            -- parse statementP "while (null) { x += 1 }"
-            --   ~?= Right
-            --     ( While
-            --         (Lit NullLiteral)
-            --         (Block [PlusBop (Var (Name "x")) (Lit (IntegerLiteral 1))])
-            --     )
       ]
 
 -- >>> runTestTT test_stat

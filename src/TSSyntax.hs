@@ -28,13 +28,12 @@ data Statement
   | ConstAssignment Var Expression -- const x: type = e
   | LetAssignment Var Expression -- let x: type = e
   | If [(Expression, Block)] Block -- if (e) { s1 } else { s2 }
-  | For Expression Expression Expression Block -- for (e1; e2; e3) { s }
+  | For Statement Expression Expression Block -- for (s; e1; e2) { s }
   | While Expression Block -- while (e) { s }
   | Break
   | Continue
-  | Try Block Expression Block -- try { s1 } catch (e) { s2 }
-  | Return Expression
-  | Switch Expression [(Expression, Block)] -- switch (e) { case e1: s1; ... }
+  | Try Block (Maybe Expression) Block Block -- try { s1 } catch (e) { s2 } finally { s3 }
+  | Return (Maybe Expression)
   | FunctionDeclaration Expression -- I was thinking of using this as a wrapper of FunctionExpression?
   -- I think we need some way to parse stuff like this (type annotations and optional parameters + unwrapping):
   -- type Obj = {
@@ -322,6 +321,9 @@ instance PP Block where
   pp (Block [s]) = pp s
   pp (Block ss) = PP.vcat (map pp ss)
 
+isEmptyBlock :: Block -> Bool
+isEmptyBlock b = pp b == PP.empty
+
 ppSS :: [Statement] -> Doc
 ppSS ss = PP.vcat (map pp ss)
 
@@ -371,9 +373,6 @@ instance PP Statement where
           <> PP.hang (PP.text "if" <+> PP.parens (pp c) <+> PP.char '{') 2 (pp b)
           PP.$$ PP.char '}'
             <> ppElseIfChain xs elseBlk
-
-      isEmptyBlock :: Block -> Bool
-      isEmptyBlock b = pp b == PP.empty
   pp (For init guard update b) =
     PP.hang (PP.text "for" <+> PP.parens (pp init <> (PP.semi <+> (pp guard <> (PP.semi <+> pp update)))) <+> PP.char '{') 2 (pp b)
       PP.$$ PP.char '}'
@@ -382,17 +381,27 @@ instance PP Statement where
       PP.$$ PP.char '}'
   pp Break = PP.text "break"
   pp Continue = PP.text "continue"
-  pp (Try b1 e b2) =
-    PP.hang (PP.text "try" <+> PP.char '{') 2 (pp b1)
-      PP.$$ PP.text "catch" <+> PP.parens (pp e) <+> PP.char '{'
-      PP.$$ pp b2
+  pp (Try b1 mbE b2 b3) =
+    PP.hang (PP.text "try {") 2 (pp b1)
       PP.$$ PP.char '}'
-  pp (Return e) = PP.text "return" <+> pp e -- TODO: support empty returns
-  pp (Switch e cases) =
-    PP.hang (PP.text "switch" <+> PP.parens (pp e) <+> PP.char '{') 2 (PP.vcat (map ppc cases))
-      PP.$$ PP.char '}'
-    where
-      ppc (e, b) = PP.text "case" <+> (pp e <> (PP.colon <+> pp b))
+        <> ( case mbE of
+               Nothing -> PP.empty
+               Just e ->
+                 PP.text " catch ("
+                   <> pp e
+                   <> PP.text ") {"
+                   PP.$$ PP.nest 2 (pp b2)
+                   PP.$$ PP.char '}'
+           )
+        <> ( if isEmptyBlock b3
+               then PP.empty
+               else
+                 PP.text " finally {"
+                   PP.$$ PP.nest 2 (pp b3)
+                   PP.$$ PP.char '}'
+           )
+  pp (Return Nothing) = PP.text "return"
+  pp (Return (Just e)) = PP.text "return" <+> pp e
   pp (FunctionDeclaration e) = undefined
   pp (FunctionCall e) = undefined
   pp Empty = PP.empty
