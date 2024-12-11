@@ -4,12 +4,12 @@ import Control.Monad (mapM_)
 import Data.Char qualified as Char
 import Data.Map (Map)
 import Data.Map qualified as Map
+import TSNumber
 import TSType
 import Test.HUnit
 import Test.QuickCheck (Arbitrary (..), Gen)
 import Test.QuickCheck qualified as QC
 import Text.PrettyPrint (Doc, (<+>))
-import TSNumber
 import Text.PrettyPrint qualified as PP
 
 newtype Block = Block [Statement]
@@ -163,9 +163,10 @@ instance PP Int where
 
 instance PP Double where
   pp :: Double -> Doc
-  pp d = if d == fromInteger (round d)
-    then PP.int (round d)
-    else PP.double d
+  pp d =
+    if d == fromInteger (round d)
+      then PP.int (round d)
+      else PP.double d
 
 instance PP Number where
   pp :: Number -> Doc
@@ -303,7 +304,7 @@ instance PP Expression where
       then pp uop <+> if isBase e then pp e else PP.parens (pp e)
       else pp uop <> if isBase e then pp e else PP.parens (pp e)
   pp (UnaryOpPostfix e uop) = if isBase e then pp e else PP.parens (pp e) <> pp uop
-  pp e@(BinaryOp _ _ _) = ppPrec 0 e
+  pp e@(BinaryOp {}) = ppPrec 0 e
     where
       ppPrec n (BinaryOp e1 bop e2) =
         ppParens (level bop < n) $
@@ -312,7 +313,7 @@ instance PP Expression where
             else ppPrec (level bop) e1 <+> pp bop <+> ppPrec (level bop + 1) e2
       ppPrec _ e' = pp e'
       ppParens b = if b then PP.parens else id
-  pp (FunctionExpression _ _ _) = undefined -- TODO: finish this
+  pp (FunctionExpression {}) = undefined -- TODO: finish this
   pp (Array es) = PP.brackets (PP.hcat (PP.punctuate PP.comma (map pp es)))
 
 -- instance PP TableField where
@@ -363,7 +364,6 @@ instance PP Statement where
 level :: Bop -> Int
 level b = case b of
   Comma -> 1
-
   Assign -> 2
   PlusAssign -> 2
   MinusAssign -> 2
@@ -380,7 +380,6 @@ level b = case b of
   AndAssign -> 2
   OrAssign -> 2
   NullishCoalescingAssign -> 2
-
   NullishCoalescing -> 3
   Or -> 4
   And -> 5
@@ -397,18 +396,14 @@ level b = case b of
   Ge -> 10
   In -> 10
   InstanceOf -> 10
-
   LeftShift -> 11
   RightShift -> 11
   UnsignedRightShift -> 11
-
   PlusBop -> 12
   MinusBop -> 12
-
   Times -> 13
   Div -> 13
   Mod -> 13
-
   Exp -> 14
 
 -- instance (PP a) => PP (Map Value a) where
@@ -425,6 +420,7 @@ level b = case b of
 --       ppa (s, v2) = pp s <+> PP.text "=" <+> pp v2
 
 -- >>> pretty ((Block [ConstAssignment (Name "num") (Lit (NumberLiteral 42)),ConstAssignment (Name "str") (Lit (StringLiteral "literal-string")),ConstAssignment (Name "boolTrue") (Lit (BooleanLiteral True)),ConstAssignment (Name "boolFalse") (Lit (BooleanLiteral False)),ConstAssignment (Name "arrOfNum") (Array [BinaryOp (BinaryOp (Lit (NumberLiteral 1)) Comma (Lit (NumberLiteral 2))) Comma (Lit (NumberLiteral 3))]),ConstAssignment (Name "arrOfStr") (Array [BinaryOp (BinaryOp (Lit (StringLiteral "a")) Comma (Lit (StringLiteral "b"))) Comma (Lit (StringLiteral "c"))]),ConstAssignment (Name "arrOfBool") (Array [BinaryOp (BinaryOp (Lit (BooleanLiteral True)) Comma (Lit (BooleanLiteral False))) Comma (Lit (BooleanLiteral True))]),ConstAssignment (Name "nullLiteral") (Lit NullLiteral),ConstAssignment (Name "decimal") (Lit (NumberLiteral 42)),ConstAssignment (Name "decimalFloat") (UnaryOpPrefix MinusUop (Lit (NumberLiteral 42.42))),ConstAssignment (Name "binary") (Lit (NumberLiteral 42)),ConstAssignment (Name "octal") (UnaryOpPrefix MinusUop (Lit (NumberLiteral 42))),ConstAssignment (Name "hexadecimal") (Lit (NumberLiteral 42)),ConstAssignment (Name "scientific") (BinaryOp (BinaryOp (BinaryOp (BinaryOp (UnaryOpPrefix MinusUop (Lit (NumberLiteral 42.0))) Times (BinaryOp (Lit (NumberLiteral 100)) Exp (Lit (NumberLiteral 2)))) LeftShift (Lit (NumberLiteral 4))) Div (Lit (NumberLiteral 4.2))) BitOr (Lit (NumberLiteral 93))),ConstAssignment (Name "scientificNegative") (Lit (NumberLiteral 0.42000000000000004)),ConstAssignment (Name "infinity") (Lit (NumberLiteral Infinity)),ConstAssignment (Name "negativeInfinity") (UnaryOpPrefix MinusUop (Lit (NumberLiteral Infinity))),ConstAssignment (Name "nan") (Lit (NumberLiteral NaN))]))
+-- "const num = 42\nconst str = \"literal-string\"\nconst boolTrue = true\nconst boolFalse = false\nconst arrOfNum = [1, 2, 3]\nconst arrOfStr = [\"a\", \"b\", \"c\"]\nconst arrOfBool = [true, false, true]\nconst nullLiteral = null\nconst decimal = 42\nconst decimalFloat = -42.42\nconst binary = 42\nconst octal = -42\nconst hexadecimal = 42\nconst scientific = (-42 * 100 ** 2 << 4) / 4.2 | 93\nconst scientificNegative = 0.42000000000000004\nconst infinity = Infinity\nconst negativeInfinity = -Infinity\nconst nan = NaN"
 
 sampleVar :: IO ()
 sampleVar = QC.sample' (arbitrary :: Gen Var) >>= mapM_ (print . pp)
