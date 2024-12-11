@@ -172,7 +172,7 @@ scientificP =
 
 -- | Parse a TS number
 -- >>> parse (many (wsP numberValP)) "1 0 23 -23 1.0 5.0 -5.0 5. .5 0.5 -.5 -0.5 -124. 1e1 1E1 10e1 10.e1 -.10e1 0.1e2 5E-5 2e-2 -1.0e1 -0.e2 0b1 0B1110 -0o4 -0O771 0x1 -0XFaC3 0XC0DE -Infinity Infinity NaN 5"
--- Right [1,0,23,-23,1.0,5.0,-5.0,5.0,0.5,0.5,-0.5,-0.5,-124.0,10.0,10.0,100.0,100.0,-1.0,10.0,5.0e-5,2.0e-2,-10.0,-0.0,1,14,-4,-505,1,-64195,49374,-Infinity,Infinity,NaN,5]
+-- Right [1,0,23,-23,1,5,-5,5,0.5,0.5,-0.5,-0.5,-124,10,10,100,100,-1,10,5.0e-5,2.0e-2,-10,0,1,14,-4,-505,1,-64195,49374,-Infinity,Infinity,NaN,5]
 numberValP :: Parser Number
 numberValP =
   wsP
@@ -181,10 +181,10 @@ numberValP =
         <|> P.try (Infinity <$ stringP "Infinity")
         <|> Double <$> signed scientificP
         <|> Double <$> signed doubleP
-        <|> Int <$> signed binaryP
-        <|> Int <$> signed octalP
-        <|> Int <$> signed hexP
-        <|> Int <$> signed intP
+        <|> Double . fromIntegral <$> signed binaryP
+        <|> Double . fromIntegral <$> signed octalP
+        <|> Double . fromIntegral <$> signed hexP
+        <|> Double . fromIntegral <$> signed intP
     )
 
 -- >>> parse (many boolValP) "true false\n true"

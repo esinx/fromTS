@@ -123,7 +123,6 @@ isSubtype' t TBracket
 isSubtype' _ _ = False
 
 typeCheckConstLiteral :: Literal -> TSTypeChecker TSType
-typeCheckConstLiteral (NumberLiteral (Int i)) = return $ TNumberLiteral (fromIntegral i)
 typeCheckConstLiteral (NumberLiteral (Double d)) = return $ TNumberLiteral d
 typeCheckConstLiteral (NumberLiteral _) = return TNumber
 typeCheckConstLiteral (StringLiteral s) = return $ TStringLiteral s

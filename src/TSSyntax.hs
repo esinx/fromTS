@@ -12,7 +12,7 @@ import Text.PrettyPrint (Doc, (<+>))
 import TSNumber
 import Text.PrettyPrint qualified as PP
 
-newtype Block = Block [Statement] -- s1 ... sn
+newtype Block = Block [Statement]
   deriving (Eq, Show)
 
 instance Semigroup Block where
@@ -24,8 +24,8 @@ instance Monoid Block where
   mempty = Block []
 
 data Statement
-  = ConstAssignment Var Expression -- const x : type = e
-  | LetAssignment Var Expression -- let x : type = e
+  = ConstAssignment Var Expression -- const x: type = e
+  | LetAssignment Var Expression -- let x: type = e
   | If Expression Block Block -- if (e) { s1 } else { s2 }
   | For Statement Expression Expression Block -- for (e1; e2; e3) { s }
   | While Expression Block -- while (e) { s }
@@ -75,7 +75,7 @@ data UopPrefix
   | IncPre -- `++` :: Int -> Int
   | PlusUop -- `+` :: Int -> Int
   | MinusUop -- `-` :: Int -> Int
-  | Void -- `void` :: a -> Undefined  // TODO: MAKE THESE TYPES MATCH the literals
+  | Void -- `void` :: a -> Undefined // TODO: MAKE THESE TYPES MATCH the literals
   deriving (Eq, Show, Enum, Bounded)
 
 data UopPostfix
@@ -148,18 +148,6 @@ pretty = PP.render . pp
 oneLine :: (PP a) => a -> String
 oneLine = PP.renderStyle (PP.style {PP.mode = PP.OneLineMode}) . pp
 
-instance PP UopPrefix where
-  -- pp Neg = PP.char '-'
-  -- pp Not = PP.text "not"
-  -- pp Len = PP.char '#'
-  pp _ = undefined
-
-instance PP UopPostfix where
-  -- pp Neg = PP.char '-'
-  -- pp Not = PP.text "not"
-  -- pp Len = PP.char '#'
-  pp _ = undefined
-
 instance PP Bool where
   pp :: Bool -> Doc
   pp True = PP.text "true"
@@ -172,6 +160,12 @@ instance PP String where
 instance PP Int where
   pp :: Int -> Doc
   pp = PP.int
+
+instance PP Double where
+  pp :: Double -> Doc
+  pp d = if d == fromInteger (round d)
+    then PP.int (round d)
+    else PP.double d
 
 instance PP Number where
   pp :: Number -> Doc
@@ -196,15 +190,63 @@ instance PP Literal where
   pp (BooleanLiteral b) = pp b
   pp NullLiteral = PP.text "null"
   pp UndefinedLiteral = PP.text "undefined"
-  -- pp (ObjectLiteral m) = PP.braces (PP.sep (PP.punctuate PP.comma (map ppa (Map.toList m)))
-  pp _ = undefined
+  pp (ObjectLiteral m) = PP.braces (PP.sep (PP.punctuate PP.comma (map ppa (Map.toList m))))
+    where
+      ppa (s, v) = PP.text s <> (PP.colon <+> pp v)
+
+instance PP TSType where
+  pp :: TSType -> Doc
+  pp TBoolean = PP.text "boolean"
+  pp (TBooleanLiteral b) = if b then PP.text "true" else PP.text "false"
+  pp TNumber = PP.text "number"
+  pp (TNumberLiteral n) = pp n
+  pp TString = PP.text "string"
+  pp (TStringLiteral s) = pp s
+  pp (TArray t) = pp t <> PP.text "[]"
+  pp (TTuple t u) = PP.text "[" <> pp t <> PP.text ", " <> pp u <> PP.text "]"
+  pp TBracket = PP.text "{}"
+  pp TObject = PP.text "object"
+  pp (TUserObject m) = undefined
+  pp (TFunction ts t) = undefined
+  pp TUnknown = PP.text "unknown"
+  pp TAny = PP.text "any"
+  pp TNever = PP.text "never"
+  pp TVoid = PP.text "void"
+  pp TNull = PP.text "null"
+  pp TUndefined = PP.text "undefined"
+  pp (TUnion ts) = PP.sep (PP.punctuate (PP.text " | ") (map pp ts))
+  pp (TIntersection ts) = PP.sep (PP.punctuate (PP.text " & ") (map pp ts))
 
 isBase :: Expression -> Bool
--- isBase TableConst {} = True
--- isBase Val {} = True
--- isBase Var {} = True
--- isBase Op1 {} = True
+isBase Var {} = True
+isBase Lit {} = True
 isBase _ = False
+
+hasSpace :: UopPrefix -> Bool
+hasSpace TypeOf = True
+hasSpace Void = True
+hasSpace _ = False
+
+missingSpaceBefore :: Bop -> Bool
+missingSpaceBefore Comma = True
+missingSpaceBefore _ = False
+
+instance PP UopPrefix where
+  pp :: UopPrefix -> Doc
+  pp Not = PP.text "!"
+  pp BitNeg = PP.text "~"
+  pp TypeOf = PP.text "typeof"
+  pp Spread = PP.text "..."
+  pp DecPre = PP.text "--"
+  pp IncPre = PP.text "++"
+  pp PlusUop = PP.char '+'
+  pp MinusUop = PP.char '-'
+  pp Void = PP.text "void"
+
+instance PP UopPostfix where
+  pp :: UopPostfix -> Doc
+  pp DecPost = PP.text "--"
+  pp IncPost = PP.text "++"
 
 instance PP Bop where
   pp :: Bop -> Doc
@@ -253,18 +295,25 @@ instance PP Bop where
 
 instance PP Expression where
   pp :: Expression -> Doc
-  -- pp (Var v) = pp v
-  -- pp (Val v) = pp v
-  -- pp (Op1 o v) = pp o <+> if isBase v then pp v else PP.parens (pp v)
-  -- pp e@Op2 {} = ppPrec 0 e
-  --   where
-  --     ppPrec n (Op2 e1 bop e2) =
-  --       ppParens (level bop < n) $
-  --         ppPrec (level bop) e1 <+> pp bop <+> ppPrec (level bop + 1) e2
-  --     ppPrec _ e' = pp e'
-  --     ppParens b = if b then PP.parens else id
-  -- pp (TableConst fs) = PP.braces (PP.sep (PP.punctuate PP.comma (map pp fs)))
-  pp _ = undefined
+  pp (Var v) = pp v
+  pp (Lit l) = pp l
+  pp (AnnotatedExpression e t) = pp e <> (PP.colon <+> pp t)
+  pp (UnaryOpPrefix uop e) =
+    if hasSpace uop
+      then pp uop <+> if isBase e then pp e else PP.parens (pp e)
+      else pp uop <> if isBase e then pp e else PP.parens (pp e)
+  pp (UnaryOpPostfix e uop) = if isBase e then pp e else PP.parens (pp e) <> pp uop
+  pp e@(BinaryOp _ _ _) = ppPrec 0 e
+    where
+      ppPrec n (BinaryOp e1 bop e2) =
+        ppParens (level bop < n) $
+          if missingSpaceBefore bop
+            then ppPrec (level bop) e1 <> (pp bop <+> ppPrec (level bop + 1) e2)
+            else ppPrec (level bop) e1 <+> pp bop <+> ppPrec (level bop + 1) e2
+      ppPrec _ e' = pp e'
+      ppParens b = if b then PP.parens else id
+  pp (FunctionExpression _ _ _) = undefined -- TODO: finish this
+  pp (Array es) = PP.brackets (PP.hcat (PP.punctuate PP.comma (map pp es)))
 
 -- instance PP TableField where
 --   pp :: TableField -> Doc
@@ -273,28 +322,43 @@ instance PP Expression where
 
 instance PP Block where
   pp :: Block -> Doc
-  -- pp (Block [s]) = pp s
-  -- pp (Block ss) = PP.vcat (map pp ss)
-  pp _ = undefined
+  pp (Block [s]) = pp s
+  pp (Block ss) = PP.vcat (map pp ss)
 
 ppSS :: [Statement] -> Doc
 ppSS ss = PP.vcat (map pp ss)
 
 instance PP Statement where
   pp :: Statement -> Doc
-  -- pp (Assign x e) = pp x <+> PP.equals <+> pp e
-  -- pp (If guard b1 b2) =
-  --   PP.hang (PP.text "if" <+> pp guard <+> PP.text "then") 2 (pp b1)
-  --     PP.$$ PP.nest 2 (PP.text "else" PP.$$ pp b2)
-  --     PP.$$ PP.text "end"
-  -- pp (While guard e) =
-  --   PP.hang (PP.text "while" <+> pp guard <+> PP.text "do") 2 (pp e)
-  --     PP.$+$ PP.text "end"
-  -- pp Empty = PP.semi
-  -- pp (Repeat b e) =
-  --   PP.hang (PP.text "repeat") 2 (pp b)
-  --     PP.$+$ PP.text "until" <+> pp e
-  pp _ = undefined
+  pp (ConstAssignment v e) = PP.text "const" <+> pp v <+> PP.equals <+> pp e
+  pp (LetAssignment v e) = PP.text "let" <+> pp v <+> PP.equals <+> pp e
+  pp (If guard b1 b2) =
+    PP.hang (PP.text "if" <+> PP.parens (pp guard) <+> PP.char '{') 2 (pp b1)
+      PP.$$ PP.nest 2 (PP.text "} else {" PP.$$ pp b2)
+      PP.$$ PP.char '}'
+  pp (For init guard update b) =
+    PP.hang (PP.text "for" <+> PP.parens (pp init <> (PP.semi <+> (pp guard <> (PP.semi <+> pp update)))) <+> PP.char '{') 2 (pp b)
+      PP.$$ PP.char '}'
+  pp (While guard e) =
+    PP.hang (PP.text "while" <+> PP.parens (pp guard) <+> PP.char '{') 2 (pp e)
+      PP.$$ PP.char '}'
+  pp Break = PP.text "break"
+  pp Continue = PP.text "continue"
+  pp (Try b1 e b2) =
+    PP.hang (PP.text "try" <+> PP.char '{') 2 (pp b1)
+      PP.$$ PP.text "catch" <+> PP.parens (pp e) <+> PP.char '{'
+      PP.$$ pp b2
+      PP.$$ PP.char '}'
+  pp (Return e) = PP.text "return" <+> pp e -- TODO: support empty returns
+  pp (Switch e cases) =
+    PP.hang (PP.text "switch" <+> PP.parens (pp e) <+> PP.char '{') 2 (PP.vcat (map ppc cases))
+      PP.$$ PP.char '}'
+    where
+      ppc (e, b) = PP.text "case" <+> (pp e <> (PP.char ':' <+> pp b))
+  pp (LabeledStatement s st) = PP.text s <> (PP.char ':' <+> pp st)
+  pp (FunctionDeclaration e) = undefined
+  pp (FunctionCall e) = undefined
+  pp Empty = PP.semi
 
 level :: Bop -> Int
 level b = case b of
@@ -360,6 +424,8 @@ level b = case b of
 --     where
 --       ppa (s, v2) = pp s <+> PP.text "=" <+> pp v2
 
+-- >>> pretty ((Block [ConstAssignment (Name "num") (Lit (NumberLiteral 42)),ConstAssignment (Name "str") (Lit (StringLiteral "literal-string")),ConstAssignment (Name "boolTrue") (Lit (BooleanLiteral True)),ConstAssignment (Name "boolFalse") (Lit (BooleanLiteral False)),ConstAssignment (Name "arrOfNum") (Array [BinaryOp (BinaryOp (Lit (NumberLiteral 1)) Comma (Lit (NumberLiteral 2))) Comma (Lit (NumberLiteral 3))]),ConstAssignment (Name "arrOfStr") (Array [BinaryOp (BinaryOp (Lit (StringLiteral "a")) Comma (Lit (StringLiteral "b"))) Comma (Lit (StringLiteral "c"))]),ConstAssignment (Name "arrOfBool") (Array [BinaryOp (BinaryOp (Lit (BooleanLiteral True)) Comma (Lit (BooleanLiteral False))) Comma (Lit (BooleanLiteral True))]),ConstAssignment (Name "nullLiteral") (Lit NullLiteral),ConstAssignment (Name "decimal") (Lit (NumberLiteral 42)),ConstAssignment (Name "decimalFloat") (UnaryOpPrefix MinusUop (Lit (NumberLiteral 42.42))),ConstAssignment (Name "binary") (Lit (NumberLiteral 42)),ConstAssignment (Name "octal") (UnaryOpPrefix MinusUop (Lit (NumberLiteral 42))),ConstAssignment (Name "hexadecimal") (Lit (NumberLiteral 42)),ConstAssignment (Name "scientific") (BinaryOp (BinaryOp (BinaryOp (BinaryOp (UnaryOpPrefix MinusUop (Lit (NumberLiteral 42.0))) Times (BinaryOp (Lit (NumberLiteral 100)) Exp (Lit (NumberLiteral 2)))) LeftShift (Lit (NumberLiteral 4))) Div (Lit (NumberLiteral 4.2))) BitOr (Lit (NumberLiteral 93))),ConstAssignment (Name "scientificNegative") (Lit (NumberLiteral 0.42000000000000004)),ConstAssignment (Name "infinity") (Lit (NumberLiteral Infinity)),ConstAssignment (Name "negativeInfinity") (UnaryOpPrefix MinusUop (Lit (NumberLiteral Infinity))),ConstAssignment (Name "nan") (Lit (NumberLiteral NaN))]))
+
 sampleVar :: IO ()
 sampleVar = QC.sample' (arbitrary :: Gen Var) >>= mapM_ (print . pp)
 
@@ -416,7 +482,7 @@ genExp :: Int -> Gen Expression
 --     n' = n `div` 2
 genExp _ = undefined
 
--- -- | Generate a list of fields in a table constructor epression.
+-- -- | Generate a list of fields in a table constructor expression.
 -- -- We limit the size of the table to avoid size blow up.
 -- genTableFields :: Int -> Gen [TableField]
 -- genTableFields n = do
