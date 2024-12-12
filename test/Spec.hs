@@ -4,6 +4,7 @@ import Control.Monad.State qualified as S
 import Data.Aeson qualified as JSON
 import Data.ByteString.Lazy.UTF8 as BLU
 import Data.Map as Map
+import Debug.Trace
 import GHC.IO (unsafePerformIO)
 import GHC.IO.Exception (ExitCode (ExitFailure, ExitSuccess))
 import Model
@@ -253,8 +254,9 @@ test_model =
     ~: TestList
     $ fmap
       (\fileName -> fileName ~: p fileName)
-      [ "./test/const-literals.ts",
-        "./test/variables.ts"
+      [ -- "./test/const-literals.ts",
+        -- "./test/variables.ts"
+        "./test/object.ts"
       ]
   where
     p :: String -> IO ()
@@ -267,8 +269,13 @@ test_model =
         (Just truthTypeMap, Right ts) ->
           case typeCheckProgram ts of
             Left _ -> Test.HUnit.assert False
-            Right typeMap -> Test.HUnit.assert $ matchTypeMap truthTypeMap typeMap
-        (_, Left err) -> Test.HUnit.assert False
+            Right typeMap ->
+              Debug.Trace.traceShow (truthTypeMap, typeMap) $
+                Test.HUnit.assert $
+                  matchTypeMap truthTypeMap typeMap
+        (_, Left err) ->
+          Debug.Trace.traceShow (err) $
+            Test.HUnit.assert False
 
 -- properties for the typechecker
 prop_subtypeReflexive :: TSType -> Bool

@@ -118,7 +118,80 @@ typeCheckBinaryOp e1 Eq e2 = do
   if isSubtype t1 t2 || isSubtype t2 t1
     then return TBoolean
     else throwError $ TypeError "type mismatch"
-typeCheckBinaryOp _ _ _ = undefined
+typeCheckBinaryOp e1 PlusBop e2 = do
+  t1 <- typeCheckExpr e1
+  t2 <- typeCheckExpr e2
+  if isSubtype t1 TString || isSubtype t2 TString
+    then return TString
+    else
+      if isSubtype t1 TNumber && isSubtype t2 TNumber
+        then return TNumber
+        else throwError $ TypeError "expected string or number type"
+typeCheckBinaryOp (Var v) PlusAssign e = do
+  t1 <- typeCheckVar v
+  t2 <- typeCheckExpr e
+  if isSubtype t1 TString || isSubtype t2 TString
+    then return TString
+    else
+      if isSubtype t1 TNumber && isSubtype t2 TNumber
+        then return TNumber
+        else throwError $ TypeError "expected string or number type"
+typeCheckBinaryOp e1 And e2 =
+  do
+    t1 <- typeCheckExpr e1
+    t2 <- typeCheckExpr e2
+    case (isTruthy t1, isTruthy t2) of
+      (Just True, _) -> return t2
+      (Just False, _) -> return t1
+      _ -> return $ TUnion [t1, t2]
+typeCheckBinaryOp e1 op e2
+  | op `elem` [Or, NullishCoalescing] =
+      do
+        t1 <- typeCheckExpr e1
+        t2 <- typeCheckExpr e2
+        case (isTruthy t1, isTruthy t2) of
+          (Just True, _) -> return t1
+          (Just False, _) -> return t2
+          _ -> return $ TUnion [t1, t2]
+typeCheckBinaryOp e1 op e2
+  | op
+      `elem` [ MinusBop,
+               Times,
+               Div,
+               Mod,
+               Exp,
+               BitAnd,
+               BitOr,
+               BitXor,
+               LeftShift,
+               RightShift,
+               UnsignedRightShift
+             ] = do
+      t1 <- typeCheckExpr e1
+      t2 <- typeCheckExpr e2
+      if isSubtype t1 TNumber && isSubtype t2 TNumber
+        then return TNumber
+        else throwError $ TypeError "expected number type"
+typeCheckBinaryOp (Var v) op e
+  | op
+      `elem` [ MinusAssign,
+               TimesAssign,
+               DivAssign,
+               ModAssign,
+               ExpAssign,
+               BitAndAssign,
+               BitOrAssign,
+               BitXorAssign,
+               LeftShiftAssign,
+               RightShiftAssign,
+               UnsignedRightShiftAssign
+             ] = do
+      t1 <- typeCheckVar v
+      t2 <- typeCheckExpr e
+      if isSubtype t1 TNumber && isSubtype t2 TNumber
+        then return TNumber
+        else throwError $ TypeError "expected number type"
+typeCheckBinaryOp _ _ _ = throwError $ TypeError "unsupported binary operation"
 
 -- | typechecks an expression, first argument indicate if we want to get the literal type
 typeCheckExpr' :: Bool -> Expression -> TSTypeChecker TSType

@@ -71,6 +71,33 @@ simplify (TIntersection ts) = simplifyIntersections (TIntersection ts) False
     simplifyIntersections t _ = t
 simplify t = t
 
+-- | checks if a type is Truthy
+isTruthy :: TSType -> Maybe Bool
+isTruthy (TBooleanLiteral b) = return b
+-- TODO: NaN is falsy
+isTruthy (TNumberLiteral n) = return $ n /= 0
+isTruthy (TStringLiteral s) = return $ not $ null s
+isTruthy TNull = return False
+isTruthy TUndefined = return False
+isTruthy TNever = return False
+isTruthy (TArray _) = return True
+isTruthy (TTuple _) = return True
+isTruthy TBracket = return True
+isTruthy TObject = return True
+isTruthy (TUserObject _) = return True
+isTruthy (TFunction _ _) = return True
+isTruthy (TUnion ts) =
+  let ts' = map isTruthy ts
+   in if Nothing `elem` ts'
+        then Nothing
+        else return $ all (== Just False) ts'
+isTruthy (TIntersection ts) =
+  let ts' = map isTruthy ts
+   in if Nothing `elem` ts'
+        then Nothing
+        else return $ elem (Just True) ts'
+isTruthy _ = Nothing
+
 isSubtype :: TSType -> TSType -> Bool
 isSubtype t1 t2 = isSubtype' (simplify t1) (simplify t2)
 
