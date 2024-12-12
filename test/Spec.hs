@@ -167,6 +167,56 @@ test_typeCheckProg =
               ]
           )
           ~?= Right (Map.fromList [("x", TBoolean)]),
+        -- shadowing
+        typeCheckProgram
+          ( Block
+              [ LetAssignment
+                  (Name "x")
+                  (Lit (BooleanLiteral True)),
+                If
+                  [ ( Var (Name "x"),
+                      Block
+                        [ LetAssignment (Name "x") (Lit (StringLiteral "hi")),
+                          LetAssignment
+                            (Name "y")
+                            (AnnotatedExpression TString (Var (Name "x")))
+                        ]
+                    )
+                  ]
+                  (Block [])
+              ]
+          )
+          ~?= Right (Map.fromList [("x", TBoolean)]),
+        typeCheckProgram
+          ( Block
+              [ LetAssignment
+                  (Name "x")
+                  (Lit (BooleanLiteral True)),
+                If
+                  [ ( Var (Name "x"),
+                      Block
+                        [ LetAssignment
+                            (Name "y")
+                            (AnnotatedExpression TString (Var (Name "x")))
+                        ]
+                    )
+                  ]
+                  (Block [])
+              ]
+          )
+          ~?= Left (TypeError "type mismatch"),
+        -- repeated declaration
+        typeCheckProgram
+          ( Block
+              [ LetAssignment
+                  (Name "x")
+                  (Lit (BooleanLiteral True)),
+                LetAssignment
+                  (Name "x")
+                  (Lit (BooleanLiteral False))
+              ]
+          )
+          ~?= Left (TypeError $ "Repeated declaration of: " ++ "x"),
         -- let x = true; let y: string = x;
         typeCheckProgram
           ( Block
