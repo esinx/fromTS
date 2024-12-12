@@ -16,10 +16,13 @@ import Prelude
 
 type TSVarEnv = [Map String TSType]
 
+type TSUserTypeEnv = [Map String TSType]
+
 type TSObjectEnv = Map String TSType
 
 data TSTypeEnv = TSTypeEnv
   { varEnvs :: TSVarEnv,
+    userTypeEnvs :: TSUserTypeEnv,
     objectEnv :: TSObjectEnv
   }
   deriving (Show, Eq)
@@ -229,6 +232,7 @@ initialTSTypeEnv :: TSTypeEnv
 initialTSTypeEnv =
   TSTypeEnv
     { varEnvs = [Map.empty],
+      userTypeEnvs = [Map.empty],
       objectEnv = Map.empty
     }
 
@@ -268,6 +272,43 @@ dropVarEnv comp = do
   case varEnvs env of
     [] -> error "empty env" -- TODO: returning empty instead of throwing error, but this should never happen
     _ : envs -> local (\env -> env {varEnvs = envs}) comp
+
+putUserTypeEnv :: String -> TSType -> ReaderT TSTypeEnv (Either Error) TSTypeEnv -> TSTypeChecker TSTypeEnv
+putUserTypeEnv name t comp = do
+  env <- ask
+  case userTypeEnvs env of
+    [] -> error "empty env" -- TODO: returning empty instead of throwing error, but this should never happen
+    currEnv : envs ->
+      if Map.member name currEnv
+        then throwError $ TypeError $ "Repeated declaration of: " ++ name
+        else local (\env -> env {userTypeEnvs = Map.insert name t currEnv : envs}) comp
+
+updateUserTypeEnv :: String -> TSType -> ReaderT TSTypeEnv (Either Error) TSTypeEnv -> TSTypeChecker TSTypeEnv
+updateUserTypeEnv name t comp = do
+  env <- ask
+  let update [] = throwError $ TypeError $ "User type " ++ name ++ " not found in the environment"
+      update (currEnv : envs) =
+        if Map.member name currEnv
+          then
+            local (\env -> env {userTypeEnvs = Map.insert name t currEnv : envs}) comp
+          else do
+            update envs
+            e <- ask
+            let envs' = userTypeEnvs e
+            local (\env -> env {userTypeEnvs = currEnv : envs'}) comp
+  update (userTypeEnvs env)
+
+createNewUserTypeEnv :: ReaderT TSTypeEnv (Either Error) TSTypeEnv -> TSTypeChecker TSTypeEnv
+createNewUserTypeEnv comp = do
+  env <- ask
+  local (\env -> env {userTypeEnvs = Map.empty : userTypeEnvs env}) comp
+
+dropUserTypeEnv :: ReaderT TSTypeEnv (Either Error) TSTypeEnv -> TSTypeChecker TSTypeEnv
+dropUserTypeEnv comp = do
+  env <- ask
+  case userTypeEnvs env of
+    [] -> error "empty env" -- TODO: returning empty instead of throwing error, but this should never happen
+    _ : envs -> local (\env -> env {userTypeEnvs = envs}) comp
 
 updateObjectEnv :: String -> TSType -> ReaderT TSTypeEnv (Either Error) TSTypeEnv -> TSTypeChecker TSTypeEnv
 updateObjectEnv name t comp = do
