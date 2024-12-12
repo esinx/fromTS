@@ -29,6 +29,6 @@ if (true) {
 
 try {
     5 + 6;
-} catch (a) {
+} catch (a: any) {
     const names = ["a", "b", "c"];
 }
