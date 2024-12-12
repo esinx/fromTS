@@ -147,6 +147,9 @@ typeCheckExpr = typeCheckExpr' True
 
 -- | typechecks a statement
 typeCheckStmt :: Statement -> Maybe TSType -> TSTypeChecker TSTypeEnv -> TSTypeChecker TSTypeEnv
+typeCheckStmt (AnyExpression e) _ comp = do
+  _ <- typeCheckExpr e
+  comp
 typeCheckStmt (ConstAssignment (Name n) e) toReturn comp = do
   t <- typeCheckExpr e
   putVarEnv n t comp
@@ -205,7 +208,7 @@ typeCheckStmt (Return Nothing) toReturn comp = do
   case toReturn of
     Just t' -> if isSubtype t' (TUnion [TVoid, TUndefined]) then comp else throwError $ TypeError "type mismatch"
     Nothing -> comp
--- TODO: typeCheckStmt (Switch e cases) toReturn comp =, functions
+-- TODO: functions
 typeCheckStmt Empty _ comp = comp
 typeCheckStmt _ _ _ = undefined
 
