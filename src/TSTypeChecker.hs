@@ -149,14 +149,17 @@ typeCheckStmt (LetAssignment (Name n) e) toReturn comp =
   do
     t <- typeCheckExpr' False e
     putVarEnv n t comp
-typeCheckStmt (If e thenBlock elseBlock) toReturn comp = do
-  t <- typeCheckExpr e
-  if isSubtype t TBoolean || isSubtype t TNumber -- TODO: not sure if more things should be allowed
-    then do
-      _ <- createNewVarEnv $ typeCheckBlock thenBlock toReturn
-      _ <- createNewVarEnv $ typeCheckBlock elseBlock toReturn
-      comp
-    else throwError $ TypeError "expected boolean type"
+typeCheckStmt (If condBlocks elseBlock) toReturn comp = do
+  mapM_
+    ( \(condBlock, block) -> do
+        t <- typeCheckExpr condBlock
+        if isSubtype t TBoolean || isSubtype t TNumber -- TODO: not sure if more things should be allowed
+          then createNewVarEnv $ typeCheckBlock block toReturn
+          else throwError $ TypeError "expected boolean type"
+    )
+    condBlocks
+  _ <- createNewVarEnv $ typeCheckBlock elseBlock toReturn
+  comp
 typeCheckStmt (For varInit guard incr block) toReturn comp = do
   _ <-
     createNewVarEnv $
