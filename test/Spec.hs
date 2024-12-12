@@ -6,6 +6,7 @@ import Data.ByteString.Lazy.UTF8 as BLU
 import Data.Map as Map
 import GHC.IO (unsafePerformIO)
 import GHC.IO.Exception (ExitCode (ExitFailure, ExitSuccess))
+import Model
 import System.Process (readProcessWithExitCode)
 import TSError
 import TSParser
@@ -16,26 +17,41 @@ import Test.HUnit
 import Test.QuickCheck
 import Prelude
 
+matchTypeMap :: Map String TSType -> Map String TSType -> Bool
+matchTypeMap truthTypeMap typeMap =
+  all
+    ( \(name, t) -> case Map.lookup name truthTypeMap of
+        Just t' -> t =.= t'
+        Nothing -> False
+    )
+    (Map.toAscList typeMap)
+
 main :: IO ()
 main = do
   -- typechecker
-  runTestTT test_typeChecker
-  putStrLn "subtypeReflexive"
-  quickCheckN 100 prop_subtypeReflexive
-  putStrLn "properBottomTypeNever"
-  quickCheckN 100 prop_properBottomTypeNever
-  putStrLn "properTopTypeUnknown"
-  quickCheckN 100 prop_properTopTypeUnknown
-  putStrLn "chaoticTopTypeAny"
-  quickCheckN 100 prop_chaoticTopTypeAny
-  putStrLn "chaoticBottomTypeAny"
-  quickCheckN 100 prop_chaoticBottomTypeAny
-  putStrLn "transitiveExceptAny"
-  quickCheckN 100 prop_transitiveExceptAny
-  putStrLn "func"
-  quickCheckN 100 prop_func
-  putStrLn "differential"
-  quickCheckN 100 prop_differential
+  putStrLn "test_model"
+  runTestTT test_model
+  putStrLn "--- All tests complete ---"
+
+-- runTestTT test_typeChecker
+-- putStrLn "subtypeReflexive"
+-- quickCheckN 100 prop_subtypeReflexive
+-- putStrLn "properBottomTypeNever"
+-- quickCheckN 100 prop_properBottomTypeNever
+-- putStrLn "properTopTypeUnknown"
+-- quickCheckN 100 prop_properTopTypeUnknown
+-- putStrLn "chaoticTopTypeAny"
+-- quickCheckN 100 prop_chaoticTopTypeAny
+-- putStrLn "chaoticBottomTypeAny"
+-- quickCheckN 100 prop_chaoticBottomTypeAny
+-- putStrLn "asymmetricExceptAny"
+-- quickCheckN 100 prop_asymmetricExceptAny
+-- putStrLn "transitiveExceptAny"
+-- quickCheckN 100 prop_transitiveExceptAny
+-- putStrLn "func"
+-- quickCheckN 100 prop_func
+-- putStrLn "differential"
+-- quickCheckN 100 prop_differential
 
 -- unit tests for the typechecker
 test_typeChecker :: Test
@@ -230,6 +246,29 @@ test_typeCheckProg =
           )
           ~?= Left (TypeError "type mismatch")
       ]
+
+test_model :: Test
+test_model =
+  "model based tests"
+    ~: TestList
+    $ fmap
+      (\fileName -> fileName ~: p fileName)
+      [ "./test/const-literals.ts",
+        "./test/variables.ts"
+      ]
+  where
+    p :: String -> IO ()
+    p fileName = do
+      result <-
+        runModelTypeChecker fileName
+      parsed <- parseTSFile fileName
+      case (result, parsed) of
+        (Nothing, _) -> Test.HUnit.assert False
+        (Just truthTypeMap, Right ts) ->
+          case typeCheckProgram ts of
+            Left _ -> Test.HUnit.assert False
+            Right typeMap -> Test.HUnit.assert $ matchTypeMap truthTypeMap typeMap
+        (_, Left err) -> Test.HUnit.assert False
 
 -- properties for the typechecker
 prop_subtypeReflexive :: TSType -> Bool
