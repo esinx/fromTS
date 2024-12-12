@@ -179,25 +179,28 @@ genStringLitType = escape <$> QC.listOf (QC.elements stringLitChars)
     stringLitChars :: [Char]
     stringLitChars = filter (\c -> c /= '\"' && (Char.isSpace c || Char.isPrint c)) ['\NUL' .. '~']
 
-genMap :: Int -> Gen (Map String TSType)
-genMap 0 = return Map.empty
-genMap n = Map.fromList <$> QC.vectorOf 2 ((,) <$> genNameType <*> genType n)
+genMap :: Int -> (Int -> Gen TSType) -> Gen (Map String TSType)
+genMap 0 _ = return Map.empty
+genMap n gen = Map.fromList <$> QC.vectorOf 2 ((,) <$> genNameType <*> gen n)
+
+-- types without data (except TAny and TNever)
+basicTypes :: [TSType]
+basicTypes =
+  [ TBoolean,
+    TNumber,
+    TString,
+    TBracket,
+    TObject,
+    TUnknown,
+    TVoid,
+    TNull,
+    TUndefined
+  ]
 
 genType :: Int -> Gen TSType
 genType 0 =
-  QC.elements
-    [ TBoolean,
-      TNumber,
-      TString,
-      TBracket,
-      TObject,
-      TUnknown,
-      TAny,
-      TNever,
-      TVoid,
-      TNull,
-      TUndefined
-    ]
+  QC.elements $
+    TAny : TNever : basicTypes
 genType n =
   QC.frequency
     [ (1, TBooleanLiteral <$> arbitrary),
@@ -205,10 +208,48 @@ genType n =
       (1, TStringLiteral <$> genStringLitType),
       (n, TArray <$> genType n'),
       (n, TTuple <$> QC.vectorOf 3 (genType n')),
-      (n, TUserObject <$> genMap n'),
+      (n, TUserObject <$> genMap n' genType),
       (n, TFunction <$> QC.vectorOf 2 (genType n') <*> genType n'),
       (n, TUnion <$> QC.vectorOf 3 (genType n')),
       (n, TIntersection <$> QC.vectorOf 3 (genType n'))
+    ]
+  where
+    n' = n `div` 2
+
+genTypeExceptNever :: Int -> Gen TSType
+genTypeExceptNever 0 =
+  QC.elements $
+    TAny : basicTypes
+genTypeExceptNever n =
+  QC.frequency
+    [ (1, TBooleanLiteral <$> arbitrary),
+      (1, TNumberLiteral <$> arbitrary),
+      (1, TStringLiteral <$> genStringLitType),
+      (n, TArray <$> genTypeExceptNever n'),
+      (n, TTuple <$> QC.vectorOf 3 (genTypeExceptNever n')),
+      (n, TUserObject <$> genMap n' genTypeExceptNever),
+      (n, TFunction <$> QC.vectorOf 2 (genTypeExceptNever n') <*> genTypeExceptNever n'),
+      (n, TUnion <$> QC.vectorOf 3 (genTypeExceptNever n')),
+      (n, TIntersection <$> QC.vectorOf 3 (genTypeExceptNever n'))
+    ]
+  where
+    n' = n `div` 2
+
+genTypeExceptAny :: Int -> Gen TSType
+genTypeExceptAny 0 =
+  QC.elements $
+    TNever : basicTypes
+genTypeExceptAny n =
+  QC.frequency
+    [ (1, TBooleanLiteral <$> arbitrary),
+      (1, TNumberLiteral <$> arbitrary),
+      (1, TStringLiteral <$> genStringLitType),
+      (n, TArray <$> genTypeExceptAny n'),
+      (n, TTuple <$> QC.vectorOf 3 (genTypeExceptAny n')),
+      (n, TUserObject <$> genMap n' genTypeExceptAny),
+      (n, TFunction <$> QC.vectorOf 2 (genTypeExceptAny n') <*> genTypeExceptAny n'),
+      (n, TUnion <$> QC.vectorOf 3 (genTypeExceptAny n')),
+      (n, TIntersection <$> QC.vectorOf 3 (genTypeExceptAny n'))
     ]
   where
     n' = n `div` 2
