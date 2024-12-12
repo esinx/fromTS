@@ -37,6 +37,7 @@ common common-stanza
     , bytestring
     , aeson
     , utf8-string
+    , safe
   default-language:
     GHC2021
   default-extensions:

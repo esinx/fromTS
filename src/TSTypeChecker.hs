@@ -9,10 +9,12 @@ import Data.Functor
 import Data.List qualified as List
 import Data.Map qualified as Map
 import GHC.IO (unsafePerformIO)
+import Safe (atMay)
 import TSError
 import TSNumber
 import TSSyntax
 import TSType
+import Prelude
 
 typeCheckConstLiteral :: Literal -> TSTypeChecker TSType
 typeCheckConstLiteral (NumberLiteral (Double d)) = return $ TNumberLiteral d
@@ -54,12 +56,15 @@ typeCheckVar (Element arrExp indexExp) = do
       if isSubtype index TNumber
         then return t
         else return TAny -- allowing implicit any
-    TTuple t u ->
+    TTuple ts ->
       case index of
-        TNumberLiteral 0 -> return t
-        TNumberLiteral 1 -> return u
-        TNumberLiteral _ -> throwError $ TypeError "no element at index >=2 in tuple"
-        t | isSubtype t TNumber -> return (TUnion [t, u])
+        TNumberLiteral n -> do
+          let i = floor n
+          let s = length ts
+          case (i >= 0 && i < s, atMay ts i) of
+            (True, Just t) -> return t
+            _ -> throwError $ TypeError $ "no element at index >=" ++ show s ++ " in tuple"
+        t | isSubtype t TNumber -> return (TUnion ts)
         _ -> return TAny
     _ -> return TAny
 
@@ -184,17 +189,22 @@ typeCheckStmt (While e block) toReturn comp = do
     else throwError $ TypeError "expected boolean type"
 typeCheckStmt Break _ comp = comp
 typeCheckStmt Continue _ comp = comp
-typeCheckStmt (Try tryBlock (Var (Name n)) catchBlock) toReturn comp = do
+typeCheckStmt (Try tryBlock (Just (Var (Name n))) catchBlock finallyBlock) toReturn comp = do
   _ <- typeCheckBlock tryBlock toReturn
   _ <- putVarEnv n TAny (createNewVarEnv $ typeCheckBlock catchBlock toReturn)
+  _ <- typeCheckBlock finallyBlock toReturn
   comp
-typeCheckStmt (Try tryBlock _ catchBlock) toReturn comp =
+typeCheckStmt (Try tryBlock _ catchBlock _) toReturn comp =
   throwError $ TypeError "expected identifier in catch block"
-typeCheckStmt (Return e) toReturn comp = do
+typeCheckStmt (Return (Just e)) toReturn comp = do
   t <- typeCheckExpr e
   case toReturn of
     Just t' -> if isSubtype t t' then comp else throwError $ TypeError "type mismatch"
     Nothing -> throwError $ TypeError "cannot return in this context"
+typeCheckStmt (Return Nothing) toReturn comp = do
+  case toReturn of
+    Just t' -> if isSubtype t' (TUnion [TVoid, TUndefined]) then comp else throwError $ TypeError "type mismatch"
+    Nothing -> comp
 -- TODO: typeCheckStmt (Switch e cases) toReturn comp =, functions
 typeCheckStmt Empty _ comp = comp
 typeCheckStmt _ _ _ = undefined
