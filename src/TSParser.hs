@@ -18,6 +18,7 @@ import Test.QuickCheck (Arbitrary (..), Gen)
 import Test.QuickCheck qualified as QC
 import Text.Megaparsec qualified as P
 import Text.Megaparsec.Char qualified as P
+import Text.Megaparsec.Char.Lexer qualified as L
 import Text.Megaparsec.Error qualified as P
 import Text.Megaparsec.Error.Builder qualified as P
 import Text.PrettyPrint (Doc, (<+>))
@@ -48,6 +49,18 @@ type ParserError = P.ParseErrorBundle String Void
 -- | Second argument of P.parse is for error messages
 parse :: Parser a -> String -> Either ParserError a
 parse = flip P.parse ""
+
+-- | Consumes whitespace and comments (single-line and multi-line)
+spaceConsumer :: Parser ()
+spaceConsumer =
+  L.space
+    P.space1
+    (L.skipLineComment "//")
+    (L.skipBlockComment "/*" "*/")
+
+-- | Applies a parser and then consumes trailing whitespace/comments
+lexeme :: Parser a -> Parser a
+lexeme = L.lexeme spaceConsumer
 
 -- | Returns Primitive parser, maintains greediness
 filterPMessage :: (a -> Bool) -> Parser a -> String -> Parser a
@@ -95,7 +108,7 @@ p `chainl1` pop = foldl comb <$> p <*> rest
 
 -- | Returns Greedy parser, maintains primitivity
 wsP :: Parser a -> Parser a
-wsP p = p <* P.space
+wsP = lexeme
 
 test_wsP :: Test
 test_wsP =
@@ -304,30 +317,9 @@ literalP =
 
 --------------------------------------------------------------------------------
 
--- | Non-Primitive, Non-Greedy
-arrayTypeP :: Parser TSType
-arrayTypeP =
-  tryChoice
-    [ stringP "Array" *> abrackets typeP,
-      TArray <$> (typeP <* brackets (pure ()))
-    ]
-
--- | Non-Primitive, Non-Greedy
-tupleP :: Parser [TSType]
-tupleP = brackets (typeP `P.sepBy` stringP ",")
-
--- | Non-Primitive, Non-Greedy
-unionP :: Parser [TSType]
-unionP = typeP `P.sepBy` stringP "|"
-
--- | Non-Primitive, Non-Greedy
-intersectionP :: Parser [TSType]
-intersectionP = typeP `P.sepBy` stringP "&"
-
 -- | Primitive, Greedy
--- TODO: Add bracket, object, UserObject, function
-typeP :: Parser TSType
-typeP =
+primaryTypeP :: Parser TSType
+primaryTypeP =
   wsP $
     tryChoice
       [ TBooleanLiteral <$> boolValP,
@@ -341,17 +333,35 @@ typeP =
         TNumber <$ stringIsoP "number",
         TStringLiteral <$> stringValP,
         TString <$ stringIsoP "string",
-        TArray <$> arrayTypeP,
-        TTuple <$> tupleP,
         TUnknown <$ stringIsoP "unknown",
         TAny <$ stringIsoP "any",
         TNever <$ stringIsoP "never",
         TVoid <$ stringIsoP "void",
         TNull <$ stringIsoP "null",
         TUndefined <$ stringIsoP "undefined",
-        TUnion <$> unionP, -- TODO: FIX UNION AND INTERSECTION PRIORITY/PRECEDENCE
-        TIntersection <$> intersectionP
+        TTuple <$> brackets (typeP `P.sepBy` stringP ","),
+        TArray <$ stringIsoP "Array" *> abrackets typeP,
+        TArray <$> primaryTypeP <* brackets (pure ()),
+        parens typeP
       ]
+
+-- | Primitive, Greedy
+intersectionTypeP :: Parser TSType
+intersectionTypeP = do
+  intersections <- primaryTypeP `P.sepBy1` stringP "&"
+  return $
+    case intersections of
+      [single] -> single
+      multiple -> TIntersection multiple
+
+-- | Primitive, Greedy
+typeP :: Parser TSType
+typeP = do
+  unions <- intersectionTypeP `P.sepBy1` stringP "|"
+  return $
+    case unions of
+      [single] -> single
+      multiple -> TUnion multiple
 
 --------------------------------------------------------------------------------
 
