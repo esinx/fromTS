@@ -111,7 +111,6 @@ isSubtype' (TNumberLiteral n1) (TNumberLiteral n2) = abs (n1 - n2) < 0.001
 isSubtype' t1 t2 | t1 == t2 = True
 isSubtype' (TNumberLiteral d) (TNumberLiteral e) = abs (d - e) < 1e-9
 -- union
-isSubtype' (TUnion ts1) (TUnion ts2) = all (\t1 -> any (isSubtype' t1) ts2) ts1 && all (\t2 -> any (isSubtype' t2) ts1) ts2
 isSubtype' (TUnion ts) t = all (`isSubtype'` t) ts
 isSubtype' t (TUnion ts) = any (isSubtype' t) ts
 -- intersection
