@@ -136,7 +136,7 @@ render b = PP.render . pp b
 pretty :: (PP a) => a -> String
 pretty = render True
 
-transpileTS :: Block -> String
+transpileTS :: (PP a) => a -> String
 transpileTS = render False
 
 -- | Compact version. Displays its argument without newlines.
