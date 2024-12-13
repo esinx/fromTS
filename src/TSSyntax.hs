@@ -286,7 +286,7 @@ instance PP Expression where
     if hasSpace uop
       then pp uop <+> if isBase e then pp e else PP.parens (pp e)
       else pp uop <> if isBase e then pp e else PP.parens (pp e)
-  pp (UnaryOpPostfix e uop) = if isBase e then pp e else PP.parens (pp e) <> pp uop
+  pp (UnaryOpPostfix e uop) = (if isBase e then pp e else PP.parens (pp e)) <> pp uop
   pp e@(BinaryOp {}) = ppPrec 0 e
     where
       ppPrec n (BinaryOp e1 bop e2) =
@@ -296,29 +296,24 @@ instance PP Expression where
       ppParens b = if b then PP.parens else id
   pp (Array es) = PP.brackets (PP.hcat (PP.punctuate PP.comma (map pp es)))
 
--- instance PP TableField where
---   pp :: TableField -> Doc
---   pp (FieldName name e) = pp name <+> PP.equals <+> pp e
---   pp (FieldKey e1 e2) = PP.brackets (pp e1) <+> PP.equals <+> pp e2
+ppSS :: [Statement] -> Doc
+ppSS ss = PP.vcat (map pp ss)
 
 instance PP Block where
   pp :: Block -> Doc
   pp (Block [s]) = pp s
-  pp (Block ss) = PP.vcat (map pp ss)
+  pp (Block ss) = ppSS ss
 
 isEmptyBlock :: Block -> Bool
 isEmptyBlock b = pp b == PP.empty
 
-ppSS :: [Statement] -> Doc
-ppSS ss = PP.vcat (map pp ss)
-
 instance PP Statement where
   pp :: Statement -> Doc
-  pp (AnyExpression e) = pp e
-  pp (ConstAssignment v (AnnotatedExpression name e)) = PP.text "const" <+> (pp v <> (PP.colon <+> pp name <+> PP.equals <+> pp e))
-  pp (ConstAssignment v e) = PP.text "const" <+> pp v <+> PP.equals <+> pp e
-  pp (LetAssignment v (AnnotatedExpression name e)) = PP.text "let" <+> (pp v <> (PP.colon <+> pp name <+> PP.equals <+> pp e))
-  pp (LetAssignment v e) = PP.text "let" <+> pp v <+> PP.equals <+> pp e
+  pp (AnyExpression e) = pp e <> PP.semi
+  pp (ConstAssignment v (AnnotatedExpression name e)) = (PP.text "const" <+> (pp v <> (PP.colon <+> pp name <+> PP.equals <+> pp e))) <> PP.semi
+  pp (ConstAssignment v e) = (PP.text "const" <+> pp v <+> PP.equals <+> pp e) <> PP.semi
+  pp (LetAssignment v (AnnotatedExpression name e)) = (PP.text "let" <+> (pp v <> (PP.colon <+> pp name <+> PP.equals <+> pp e))) <> PP.semi
+  pp (LetAssignment v e) = (PP.text "let" <+> pp v <+> PP.equals <+> pp e) <> PP.semi
   pp (If [] elseBlock) =
     PP.text "if (false) {} else {"
       PP.$$ PP.nest 2 (pp elseBlock)
@@ -366,8 +361,8 @@ instance PP Statement where
   pp (While guard e) =
     PP.hang (PP.text "while" <+> PP.parens (pp guard) <+> PP.char '{') 2 (pp e)
       PP.$$ PP.char '}'
-  pp Break = PP.text "break"
-  pp Continue = PP.text "continue"
+  pp Break = PP.text "break" <> PP.semi
+  pp Continue = PP.text "continue" <> PP.semi
   pp (Try b1 mbE b2 b3) =
     PP.hang (PP.text "try {") 2 (pp b1)
       PP.$$ PP.char '}'
@@ -387,10 +382,10 @@ instance PP Statement where
                    PP.$$ PP.nest 2 (pp b3)
                    PP.$$ PP.char '}'
            )
-  pp (Return Nothing) = PP.text "return"
-  pp (Return (Just e)) = PP.text "return" <+> pp e
-  pp (TypeAlias n t) = PP.text "type" <+> pp n <+> PP.equals <+> pp t
-  pp (InterfaceDeclaration n t) = PP.text "interface" <+> pp n <+> PP.equals <+> pp t
+  pp (Return Nothing) = PP.text "return" <> PP.semi
+  pp (Return (Just e)) = (PP.text "return" <+> pp e) <> PP.semi
+  pp (TypeAlias n t) = (PP.text "type" <+> pp n <+> PP.equals <+> pp t) <> PP.semi
+  pp (InterfaceDeclaration n t) = (PP.text "interface" <+> pp n <+> PP.equals <+> pp t) <> PP.semi
   pp Empty = PP.empty
 
 level :: Bop -> Int

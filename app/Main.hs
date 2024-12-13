@@ -18,7 +18,9 @@ main = do
   case args of
     [filename] -> do
       result <- fromTS filename
+      -- ast <- parseTSFile filename
+      -- print ast
       case result of
-        Right js -> print js
+        Right js -> putStrLn js
         Left err -> print err
     _ -> putStrLn "Usage: fromTS <filename>"
