@@ -77,6 +77,7 @@ genStatement n =
       (1, InterfaceDeclaration <$> genName <*> arbitrary),
       (n, AnyExpression <$> genExp n'),
       (n, If <$> QC.vectorOf 3 ((,) <$> genExp n' <*> genBlock n') <*> genBlock n'),
+      (n, Return <$> makeGenMaybe (genExp n')),
       -- generate loops half as frequently as if statements
       (n', While <$> genExp n' <*> genBlock n'),
       ( n',
@@ -86,7 +87,7 @@ genStatement n =
           <*> genBlock n'
           <*> genBlock n'
       ),
-      (n', Return <$> makeGenMaybe (genExp n'))
+      (n', For <$> genStatement n' <*> genExp n' <*> genExp n' <*> genBlock n')
     ]
   where
     n' = n `div` 2

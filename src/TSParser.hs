@@ -318,7 +318,6 @@ objectValP :: Parser (Map String Expression)
 objectValP = fromList <$> braces (propertyP `P.sepEndBy` (stringP "," <|> (wsP P.newline $> ())))
 
 -- | Primitive, Greedy
--- TODO: Support Object literals
 literalP :: Parser Literal
 literalP =
   tryChoice
@@ -430,7 +429,6 @@ objectTypeP :: Parser TSType
 objectTypeP = TUserObject . fromList <$> braces (typePropertyP `P.sepEndBy` (stringP ";" <|> (wsP P.newline $> ())))
 
 -- | Primitive, Greedy
--- TODO: Add function
 baseTypeP :: Parser TSType
 baseTypeP =
   wsP $

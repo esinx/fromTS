@@ -1,4 +1,3 @@
-
 ## Variables, Literals
 
 `fromTS` supports the following variable types:
@@ -62,7 +61,7 @@ a ||= true;
 
 #### Comparisons
 
-`fromTS` will consider equality between two variables of different types to be false. This is because TypeScript does not allow comparisons between variables of different types. 
+`fromTS` will consider equality between two variables of different types to be false. This is because TypeScript does not allow comparisons between variables of different types.
 
 #### `==` or `===` with `{}`
 
@@ -79,6 +78,7 @@ const b2 = obj == str; // type error, but fromTS allows this
 ## Generics
 
 `fromTS` does not support generics outside of standard array notation:
+
 ```typescript
 const arr: number[] = [1, 2, 3];
 const arr2: string[] = ["Hello", "World"];
@@ -87,3 +87,27 @@ const arr2: string[] = ["Hello", "World"];
 ## Functions
 
 `fromTS` does not support functions.
+
+## Other Non-Supported Features
+
+-   Classes
+-   Type extensions
+-   Comma binary operator
+-   "as const"
+-   BinInt (not supported lower than ES2020 anyway)
+-   Functions and function calls
+-   For loops without any expressions in them (e.g. for (;;))
+-   Template strings and template literals
+-   Support nested strings (in templates)
+-   Escape characters in strings
+-   Destructuring
+-   Support for "let x;" and "let x: number;" (without assignment)
+-   Types with arbitrary string keys. E.g:
+
+```typescript
+const test123: {
+    [key: string]: string;
+} = {
+    test: "test",
+};
+```
