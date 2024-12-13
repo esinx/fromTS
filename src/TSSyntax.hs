@@ -2,7 +2,7 @@ module TSSyntax where
 
 import Control.Monad (mapM_)
 import Data.Char qualified as Char
-import Data.Map (Map)
+import Data.Map (Map, fromList)
 import Data.Map qualified as Map
 import TSNumber
 import TSType
@@ -111,7 +111,6 @@ data Bop
   | OrAssign -- `||=`
   | NullishCoalescing -- `??`
   | NullishCoalescingAssign -- `??=`
-  | Comma -- `,`
   | Eq -- `==`
   | Neq -- `!=`
   | EqStrict -- `===`
@@ -221,10 +220,6 @@ hasSpace TypeOf = True
 hasSpace Void = True
 hasSpace _ = False
 
-missingSpaceBefore :: Bop -> Bool
-missingSpaceBefore Comma = True
-missingSpaceBefore _ = False
-
 instance PP UopPrefix where
   pp :: UopPrefix -> Doc
   pp Not = PP.text "!"
@@ -275,7 +270,6 @@ instance PP Bop where
   pp OrAssign = PP.text "||="
   pp NullishCoalescing = PP.text "??"
   pp NullishCoalescingAssign = PP.text "??="
-  pp Comma = PP.char ','
   pp Eq = PP.text "=="
   pp Neq = PP.text "!="
   pp EqStrict = PP.text "==="
@@ -301,9 +295,7 @@ instance PP Expression where
     where
       ppPrec n (BinaryOp e1 bop e2) =
         ppParens (level bop < n) $
-          if missingSpaceBefore bop
-            then ppPrec (level bop) e1 <> (pp bop <+> ppPrec (level bop + 1) e2)
-            else ppPrec (level bop) e1 <+> pp bop <+> ppPrec (level bop + 1) e2
+          ppPrec (level bop) e1 <+> pp bop <+> ppPrec (level bop + 1) e2
       ppPrec _ e' = pp e'
       ppParens b = if b then PP.parens else id
   pp (FunctionExpression {}) = undefined -- TODO: finish this
@@ -408,7 +400,6 @@ instance PP Statement where
 
 level :: Bop -> Int
 level b = case b of
-  Comma -> 1
   Assign -> 2
   PlusAssign -> 2
   MinusAssign -> 2
@@ -451,8 +442,8 @@ level b = case b of
   Mod -> 13
   Exp -> 14
 
--- >>> pretty ((Block [ConstAssignment (Name "num") (Lit (NumberLiteral 42)),ConstAssignment (Name "str") (Lit (StringLiteral "literal-string")),ConstAssignment (Name "boolTrue") (Lit (BooleanLiteral True)),ConstAssignment (Name "boolFalse") (Lit (BooleanLiteral False)),ConstAssignment (Name "arrOfNum") (Array [BinaryOp (BinaryOp (Lit (NumberLiteral 1)) Comma (Lit (NumberLiteral 2))) Comma (Lit (NumberLiteral 3))]),ConstAssignment (Name "arrOfStr") (Array [BinaryOp (BinaryOp (Lit (StringLiteral "a")) Comma (Lit (StringLiteral "b"))) Comma (Lit (StringLiteral "c"))]),ConstAssignment (Name "arrOfBool") (Array [BinaryOp (BinaryOp (Lit (BooleanLiteral True)) Comma (Lit (BooleanLiteral False))) Comma (Lit (BooleanLiteral True))]),ConstAssignment (Name "nullLiteral") (Lit NullLiteral),ConstAssignment (Name "decimal") (Lit (NumberLiteral 42)),ConstAssignment (Name "decimalFloat") (UnaryOpPrefix MinusUop (Lit (NumberLiteral 42.42))),ConstAssignment (Name "binary") (Lit (NumberLiteral 42)),ConstAssignment (Name "octal") (UnaryOpPrefix MinusUop (Lit (NumberLiteral 42))),ConstAssignment (Name "hexadecimal") (Lit (NumberLiteral 42)),ConstAssignment (Name "scientific") (BinaryOp (BinaryOp (BinaryOp (BinaryOp (UnaryOpPrefix MinusUop (Lit (NumberLiteral 42.0))) Times (BinaryOp (Lit (NumberLiteral 100)) Exp (Lit (NumberLiteral 2)))) LeftShift (Lit (NumberLiteral 4))) Div (Lit (NumberLiteral 4.2))) BitOr (Lit (NumberLiteral 93))),ConstAssignment (Name "scientificNegative") (Lit (NumberLiteral 0.42000000000000004)),ConstAssignment (Name "infinity") (Lit (NumberLiteral Infinity)),ConstAssignment (Name "negativeInfinity") (UnaryOpPrefix MinusUop (Lit (NumberLiteral Infinity))),ConstAssignment (Name "nan") (Lit (NumberLiteral NaN))]))
--- "const num = 42\nconst str = \"literal-string\"\nconst boolTrue = true\nconst boolFalse = false\nconst arrOfNum = [1, 2, 3]\nconst arrOfStr = [\"a\", \"b\", \"c\"]\nconst arrOfBool = [true, false, true]\nconst nullLiteral = null\nconst decimal = 42\nconst decimalFloat = -42.42\nconst binary = 42\nconst octal = -42\nconst hexadecimal = 42\nconst scientific = (-42 * 100 ** 2 << 4) / 4.2 | 93\nconst scientificNegative = 0.42000000000000004\nconst infinity = Infinity\nconst negativeInfinity = -Infinity\nconst nan = NaN"
+-- >>> pretty (Block [ConstAssignment (Name "num") (Lit (NumberLiteral 42)),ConstAssignment (Name "str") (Lit (StringLiteral "literal-string")),ConstAssignment (Name "boolTrue") (AnnotatedExpression (TBooleanLiteral False) (Lit (BooleanLiteral True))),ConstAssignment (Name "boolFalse") (AnnotatedExpression TBoolean (Lit (BooleanLiteral False))),ConstAssignment (Name "constObj") (AnnotatedExpression (TTuple [TNumber,TBoolean]) (Lit (ObjectLiteral (fromList [("key",Lit (StringLiteral "value"))])))),ConstAssignment (Name "obj") (Lit (ObjectLiteral (fromList [("key",Lit (StringLiteral "value")),("key2",Lit (NumberLiteral 42))]))),ConstAssignment (Name "arrOfNum") (Array [Lit (NumberLiteral 1),Lit (NumberLiteral 2),Lit (NumberLiteral 3)]),ConstAssignment (Name "arrOfStr") (Array [Lit (StringLiteral "a"),Lit (StringLiteral "b"),Lit (StringLiteral "c")]),ConstAssignment (Name "arrOfBool") (Array [Lit (BooleanLiteral True),Lit (BooleanLiteral False),Lit (BooleanLiteral True)]),ConstAssignment (Name "arrOfObj") (Array [Lit (ObjectLiteral (fromList [("key",Lit (StringLiteral "value"))])),Lit (ObjectLiteral (fromList [("key",Lit (StringLiteral "value"))]))]),ConstAssignment (Name "arrOfArr") (Array [Array [Lit (NumberLiteral 1),Lit (NumberLiteral 2),Lit (NumberLiteral 3)],Array [Lit (StringLiteral "a"),Lit (StringLiteral "b"),Lit (StringLiteral "c")]]),ConstAssignment (Name "arrOfMixed") (Array [Lit (NumberLiteral 1),Lit (StringLiteral "a"),Lit (BooleanLiteral True),Lit (ObjectLiteral (fromList [("key",Lit (StringLiteral "value"))])),Array [Lit (NumberLiteral 1),Lit (NumberLiteral 2),Lit (NumberLiteral 3)]]),ConstAssignment (Name "nullLiteral") (Lit NullLiteral),ConstAssignment (Name "decimal") (AnnotatedExpression TNumber (Lit (NumberLiteral 42))),ConstAssignment (Name "decimalFloat") (UnaryOpPrefix MinusUop (Lit (NumberLiteral 42.42))),ConstAssignment (Name "binary") (Lit (NumberLiteral 42)),ConstAssignment (Name "octal") (AnnotatedExpression TString (UnaryOpPrefix MinusUop (Lit (NumberLiteral 42)))),ConstAssignment (Name "hexadecimal") (Lit (NumberLiteral 42)),ConstAssignment (Name "scientific") (BinaryOp (BinaryOp (BinaryOp (BinaryOp (UnaryOpPrefix MinusUop (Lit (NumberLiteral 42))) Times (BinaryOp (Lit (NumberLiteral 100)) Exp (Lit (NumberLiteral 2)))) LeftShift (Lit (NumberLiteral 4))) Div (Lit (NumberLiteral 4.2))) BitOr (Lit (NumberLiteral 93))),ConstAssignment (Name "scientificNegative") (Lit (NumberLiteral 0.42000000000000004)),ConstAssignment (Name "infinity") (Lit (NumberLiteral Infinity)),ConstAssignment (Name "negativeInfinity") (UnaryOpPrefix MinusUop (Lit (NumberLiteral Infinity))),ConstAssignment (Name "nan") (Lit (NumberLiteral NaN)),For (LetAssignment (Name "x") (Lit (NumberLiteral 0))) (BinaryOp (Var (Name "x")) Lt (Lit (NumberLiteral 10))) (UnaryOpPostfix (Var (Name "x")) IncPost) (Block [AnyExpression (BinaryOp (Var (Name "i")) Assign (Var (Name "x")))]),If [(Lit (BooleanLiteral True),Block [LetAssignment (Name "val") (Lit (StringLiteral "5 == 6"))]),(BinaryOp (BinaryOp (Lit (NumberLiteral 5)) MinusBop (Lit (NumberLiteral 7))) Lt (Lit (NumberLiteral 21)),Block [AnyExpression (BinaryOp (Var (Name "val2")) Assign (Lit (BooleanLiteral True)))])] (Block []),Try (Block [AnyExpression (BinaryOp (Lit (NumberLiteral 5)) PlusBop (Lit (NumberLiteral 6)))]) (Just (AnnotatedExpression TAny (Var (Name "a")))) (Block [ConstAssignment (Name "names") (Array [Lit (StringLiteral "a"),Lit (StringLiteral "b"),Lit (StringLiteral "c")])]) (Block []),TypeAlias "MyType" (TUnion [TNumber,TString,TBoolean]),ConstAssignment (Name "test") (AnnotatedExpression (TTypeAlias "MyType") (Lit (NumberLiteral 5))),TypeAlias "MyType2" (TUserObject (fromList [("field1",TNumber),("field2",TUnion [TString,TUndefined]),("field3",TUnion [TBoolean,TTypeAlias "MyType"]),("field4",TArray (TUnion [TNumber,TUnion [TTypeAlias "MyType2",TTypeAlias "MyType"]])),("test field",TNumberLiteral 5.0)])),InterfaceDeclaration "MyType3" (TUserObject (fromList [("field1",TNumber),("field2",TString),("field3",TUnion [TUnion [TBoolean,TTypeAlias "MyType"],TUndefined]),("field4",TUnion [TUnion [TNumber,TArray (TUnion [TTypeAlias "MyType2",TTypeAlias "MyType"])],TUndefined])]))])
+-- "const num = 42\nconst str = \"literal-string\"\nconst boolTrue = false: true\nconst boolFalse = boolean: false\nconst constObj = [number,boolean]: {key: \"value\"}\nconst obj = {key: \"value\", key2: 42}\nconst arrOfNum = [1,2,3]\nconst arrOfStr = [\"a\",\"b\",\"c\"]\nconst arrOfBool = [true,false,true]\nconst arrOfObj = [{key: \"value\"},{key: \"value\"}]\nconst arrOfArr = [[1,2,3],[\"a\",\"b\",\"c\"]]\nconst arrOfMixed = [1,\"a\",true,{key: \"value\"},[1,2,3]]\nconst nullLiteral = null\nconst decimal = number: 42\nconst decimalFloat = -42.42\nconst binary = 42\nconst octal = string: -42\nconst hexadecimal = 42\nconst scientific = (-42 * 100 ** 2 << 4) / 4.2 | 93\nconst scientificNegative = 0.42000000000000004\nconst infinity = Infinity\nconst negativeInfinity = -Infinity\nconst nan = NaN\nfor (let x = 0; x < 10; x) { i = x\n}\nif (true) { let val = \"5 == 6\"\n} elseif (5 - 7 < 21) { val2 = true\n}\ntry { 5 + 6\n} catch (any: a) {\n   const names = [\"a\",\"b\",\"c\"]\n }\ntype MyType = number |  string |  boolean\nconst test = MyType: 5\ntype MyType2 = {field1: number,\n                field2: string |  undefined,\n                field3: boolean |  MyType,\n                field4: number |  MyType2 |  MyType[],\n                test field: 5}\ninterface MyType3 = {field1: number,\n                     field2: string,\n                     field3: boolean |  MyType |  undefined,\n                     field4: number |  MyType2 |  MyType[] |  undefined}"
 
 sampleVar :: IO ()
 sampleVar = QC.sample' (arbitrary :: Gen Var) >>= mapM_ (print . pp)

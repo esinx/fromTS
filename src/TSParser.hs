@@ -6,7 +6,8 @@ import Data.Char qualified as Char
 import Data.Functor
 import Data.List (foldl')
 import Data.List.NonEmpty qualified as NE
-import Data.Map (fromList)
+import Data.Map (Map, fromList)
+import Data.Map qualified as Map
 import Data.Set (singleton)
 import Data.Void (Void)
 import System.IO qualified as IO
@@ -305,6 +306,17 @@ test_stringValP =
 -- Counts {cases = 4, tried = 4, errors = 0, failures = 0}
 
 -- | Primitive, Greedy
+propertyP :: Parser (String, Expression)
+propertyP = P.try $ do
+  key <- stringValP <|> nameP
+  stringP ":"
+  val <- expP
+  return (key, val)
+
+objectValP :: Parser (Map String Expression)
+objectValP = fromList <$> braces (propertyP `P.sepEndBy` (stringP "," <|> (wsP P.newline $> ())))
+
+-- | Primitive, Greedy
 -- TODO: Support Object literals
 literalP :: Parser Literal
 literalP =
@@ -313,7 +325,8 @@ literalP =
       BooleanLiteral <$> boolValP,
       NullLiteral <$ stringIsoP "null",
       UndefinedLiteral <$ stringIsoP "undefined",
-      StringLiteral <$> stringValP
+      StringLiteral <$> stringValP,
+      ObjectLiteral <$> objectValP
     ]
 
 --------------------------------------------------------------------------------
@@ -400,8 +413,8 @@ nameP =
 --------------------------------------------------------------------------------
 
 -- | Primitive, Greedy
-propertyP :: Parser (String, TSType)
-propertyP = P.try $ do
+typePropertyP :: Parser (String, TSType)
+typePropertyP = P.try $ do
   key <- stringValP <|> nameP
   isOpt <- optional (stringP "?")
   stringP ":"
@@ -413,7 +426,7 @@ propertyP = P.try $ do
 
 -- | Primitive, Greedy
 objectTypeP :: Parser TSType
-objectTypeP = TUserObject . fromList <$> braces (propertyP `P.sepEndBy` (stringP ";" <|> (wsP P.newline $> ())))
+objectTypeP = TUserObject . fromList <$> braces (typePropertyP `P.sepEndBy` (stringP ";" <|> (wsP P.newline $> ())))
 
 -- | Primitive, Greedy
 -- TODO: Add function
@@ -438,7 +451,7 @@ baseTypeP =
         TVoid <$ stringIsoP "void",
         TNull <$ stringIsoP "null",
         TUndefined <$ stringIsoP "undefined",
-        TTuple <$> brackets (typeP `P.sepBy` stringP ","),
+        TTuple <$> brackets (typeP `P.sepEndBy` stringP ","),
         -- TArray <$ stringIsoP "Array" *> abrackets typeP,
         -- TBracket <$ braces (pure ()),
         objectTypeP,
@@ -537,8 +550,7 @@ bopP =
         P.string ">" >> ((P.char '=' $> Ge) <|> pure Gt),
         P.string "=" $> Assign,
         stringIso "instanceof" $> InstanceOf,
-        stringIso "in" $> In,
-        P.string "," $> Comma
+        stringIso "in" $> In
       ]
 
 -- >>> parse (many bopP) "+ >= .."
@@ -572,8 +584,8 @@ varP = tryChoice [mkVar <$> prefixP <*> some indexP, Name <$> nameP]
 baseExpP :: Parser Expression
 baseExpP =
   tryChoice
-    [ Lit <$> literalP,
-      Array <$> brackets (expP `P.sepBy` stringP ","),
+    [ Array <$> brackets (expP `P.sepEndBy` stringP ","),
+      Lit <$> literalP,
       Var <$> varP,
       parens expP
     ]
@@ -628,7 +640,7 @@ expP =
       exp4 = chainLevel exp5 4 -- or
       exp3 = chainLevel exp4 3 -- ??
       exp2 = chainLevel exp3 2 -- Assignments
-      exp1 = chainLevel exp2 1 -- comma
+      exp1 = chainLevel exp2 1 -- none
    in exp1
 
 --------------------------------------------------------------------------------
