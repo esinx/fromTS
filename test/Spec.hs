@@ -40,6 +40,17 @@ matchTypeMap truthTypeMap typeMap =
 
 main :: IO ()
 main = do
+  -- parser
+  putStrLn "test parser"
+  test_all
+  putStrLn "roundtrip_val"
+  quickCheckN 100 prop_roundtrip_lit
+  putStrLn "roundtrip_exp"
+  quickCheckN 100 prop_roundtrip_exp
+  putStrLn "roundtrip_stat"
+  quickCheckN 100 prop_roundtrip_stat
+  putStrLn "roundtrip_block"
+  quickCheckN 100 prop_roundtrip_block
   -- typechecker
   putStrLn "test_model"
   runTestTT test_model
@@ -59,6 +70,12 @@ main = do
   putStrLn "differential"
   quickCheckN 1000 prop_differential
   putStrLn "--- All tests complete ---"
+
+-- unit tests for the parser
+test_all :: IO Counts
+test_all =
+  runTestTT $
+    TestList [test_comb, test_literal, test_exp, test_stat, tParseFiles]
 
 -- unit tests for the typechecker
 test_typeChecker :: Test
@@ -323,6 +340,24 @@ test_model =
     p fileName = do
       result <- compareToModel fileName
       assertBool fileName result
+
+-- properties for the parser
+
+-- | Tests parsing the pretty printed value of a literal, should match
+prop_roundtrip_lit :: Literal -> Bool
+prop_roundtrip_lit v = parse literalP (pretty v) == Right v
+
+-- | Tests parsing the pretty printed value of an expression, should match
+prop_roundtrip_exp :: Expression -> Bool
+prop_roundtrip_exp e = parse expP (pretty e) == Right e
+
+-- | Tests parsing the pretty printed value of a statement, should match
+prop_roundtrip_stat :: Statement -> Bool
+prop_roundtrip_stat s = parse statementP (pretty s) == Right s
+
+-- | Tests parsing the pretty printed value of a block, should match
+prop_roundtrip_block :: Block -> Bool
+prop_roundtrip_block s = parse blockP (pretty s) == Right s
 
 -- properties for the typechecker
 prop_subtypeReflexive :: TSType -> Bool
