@@ -602,7 +602,8 @@ annotatedExpP = do
 prefixExpP :: Parser Expression
 prefixExpP =
   tryChoice
-    [ UnaryOpPrefix <$> uopPrefixP <*> prefixExpP,
+    [ Lit . NumberLiteral <$> (NInfinity <$ stringIso "-Infinity"),
+      UnaryOpPrefix <$> uopPrefixP <*> prefixExpP,
       annotatedExpP
     ]
 

@@ -183,6 +183,9 @@ instance Arbitrary Bop where
 shrinkStringLit :: String -> [String]
 shrinkStringLit s = filter (/= '\"') <$> shrink s
 
+shrinkMapExpr :: Map.Map String Expression -> [Map.Map String Expression]
+shrinkMapExpr m = [Map.fromList [(s, e') | e' <- shrink e] | (s, e) <- Map.toList m]
+
 instance Arbitrary Literal where
   arbitrary :: Gen Literal
   arbitrary =
@@ -192,7 +195,7 @@ instance Arbitrary Literal where
         pure NullLiteral,
         pure UndefinedLiteral,
         StringLiteral <$> genStringLit,
-        ObjectLiteral . Map.fromList <$> QC.vectorOf 3 ((,) <$> genStringLit <*> arbitrary)
+        ObjectLiteral . Map.fromList <$> QC.vectorOf 3 ((,) <$> genName <*> arbitrary)
       ]
 
   shrink :: Literal -> [Literal]
@@ -201,26 +204,16 @@ instance Arbitrary Literal where
   shrink NullLiteral = []
   shrink UndefinedLiteral = []
   shrink (StringLiteral s) = StringLiteral <$> shrinkStringLit s
-  shrink (ObjectLiteral m) = ObjectLiteral <$> shrink m
+  shrink (ObjectLiteral m) = ObjectLiteral <$> shrinkMapExpr m
 
 sampleVar :: IO ()
-sampleVar = QC.sample' (arbitrary :: Gen Var) >>= mapM_ (print . pp)
+sampleVar = QC.sample' (arbitrary :: Gen Var) >>= mapM_ (print . pp True)
 
 sampleExp :: IO ()
-sampleExp = QC.sample' (arbitrary :: Gen Expression) >>= mapM_ (print . pp)
+sampleExp = QC.sample' (arbitrary :: Gen Expression) >>= mapM_ (print . pp True)
 
 sampleStat :: IO ()
-sampleStat = QC.sample' (arbitrary :: Gen Statement) >>= mapM_ (print . pp)
+sampleStat = QC.sample' (arbitrary :: Gen Statement) >>= mapM_ (print . pp True)
 
 quickCheckN :: (QC.Testable prop) => Int -> prop -> IO ()
 quickCheckN n = QC.quickCheckWith $ QC.stdArgs {QC.maxSuccess = n, QC.maxSize = 100}
-
-newtype Filename = Filename String
-  deriving (Show)
-
-instance Arbitrary Filename where
-  arbitrary :: Gen Filename
-  arbitrary = Filename <$> QC.listOf1 (QC.elements ['a' .. 'z'])
-
-  shrink :: Filename -> [Filename]
-  shrink (Filename s) = []

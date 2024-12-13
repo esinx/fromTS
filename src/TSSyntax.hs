@@ -126,87 +126,93 @@ data Var
   deriving (Eq, Show)
 
 class PP a where
-  pp :: a -> Doc
+  pp :: Bool -> a -> Doc
 
 -- | Default operation for the pretty printer. Displays using standard formatting
 -- rules, with generous use of indentation and newlines.
+render :: (PP a) => Bool -> a -> String
+render b = PP.render . pp b
+
 pretty :: (PP a) => a -> String
-pretty = PP.render . pp
+pretty = render True
+
+transpileTS :: Block -> String
+transpileTS = render False
 
 -- | Compact version. Displays its argument without newlines.
-oneLine :: (PP a) => a -> String
-oneLine = PP.renderStyle (PP.style {PP.mode = PP.OneLineMode}) . pp
+oneLine :: (PP a) => Bool -> a -> String
+oneLine b = PP.renderStyle (PP.style {PP.mode = PP.OneLineMode}) . pp b
 
 commaSpace :: Doc
 commaSpace = PP.text ", "
 
 instance PP Bool where
-  pp :: Bool -> Doc
-  pp True = PP.text "true"
-  pp False = PP.text "false"
+  pp :: Bool -> Bool -> Doc
+  pp _ True = PP.text "true"
+  pp _ False = PP.text "false"
 
 instance PP String where
-  pp :: String -> Doc
-  pp = PP.text
+  pp :: Bool -> String -> Doc
+  pp _ = PP.text
 
 instance PP Int where
-  pp :: Int -> Doc
-  pp = PP.int
+  pp :: Bool -> Int -> Doc
+  pp _ = PP.int
 
 instance PP Double where
-  pp :: Double -> Doc
-  pp d =
+  pp :: Bool -> Double -> Doc
+  pp _ d =
     if d == fromInteger (round d)
       then PP.int (round d)
       else PP.double d
 
 instance PP Number where
-  pp :: Number -> Doc
-  pp = PP.text . show
+  pp :: Bool -> Number -> Doc
+  pp _ = PP.text . show
 
 instance PP Var where
-  pp :: Var -> Doc
-  pp (Name n) = PP.text n
-  pp (Dot (Var v) k) = pp v <> PP.text "." <> pp k
-  pp (Dot t k) = PP.parens (pp t) <> PP.text "." <> pp k
-  pp (Element (Var v) k) = pp v <> PP.brackets (pp k)
-  pp (Element t k) = PP.parens (pp t) <> PP.brackets (pp k)
+  pp :: Bool -> Var -> Doc
+  pp _ (Name n) = PP.text n
+  pp b (Dot (Var v) k) = pp b v <> PP.text "." <> pp b k
+  pp b (Dot t k) = PP.parens (pp b t) <> PP.text "." <> pp b k
+  pp b (Element (Var v) k) = pp b v <> PP.brackets (pp b k)
+  pp b (Element t k) = PP.parens (pp b t) <> PP.brackets (pp b k)
 
 instance PP Literal where
-  pp :: Literal -> Doc
-  pp (NumberLiteral i) = pp i
-  pp (StringLiteral s) = PP.text ("\"" <> s <> "\"")
-  pp (BooleanLiteral b) = pp b
-  pp NullLiteral = PP.text "null"
-  pp UndefinedLiteral = PP.text "undefined"
-  pp (ObjectLiteral m) = PP.braces (PP.sep (PP.punctuate commaSpace (map ppa (Map.toList m))))
+  pp :: Bool -> Literal -> Doc
+  pp b (NumberLiteral i) = pp b i
+  pp _ (StringLiteral s) = PP.text ("\"" <> s <> "\"")
+  pp t (BooleanLiteral b) = pp t b
+  pp _ NullLiteral = PP.text "null"
+  pp _ UndefinedLiteral = PP.text "undefined"
+  pp b (ObjectLiteral m) = PP.braces (PP.space <> PP.sep (PP.punctuate PP.comma (map ppa (Map.toList m))) <> PP.space)
     where
-      ppa (s, v) = PP.text s <> (PP.colon <+> pp v)
+      ppa (s, v) = PP.text s <> (PP.colon <+> pp b v)
 
 instance PP TSType where
-  pp :: TSType -> Doc
-  pp TBoolean = PP.text "boolean"
-  pp (TBooleanLiteral b) = if b then PP.text "true" else PP.text "false"
-  pp TNumber = PP.text "number"
-  pp (TNumberLiteral n) = pp n
-  pp TString = PP.text "string"
-  pp (TStringLiteral s) = pp $ "\"" ++ s ++ "\""
-  pp (TArray t) = pp t <> PP.text "[]"
-  pp (TTuple ts) = PP.brackets (PP.hcat (PP.punctuate commaSpace (map pp ts)))
-  pp TBracket = PP.text "{}"
-  pp TObject = PP.text "object"
-  pp (TTypeAlias n) = pp n
-  pp (TUserObject m) = PP.braces (PP.sep (PP.punctuate commaSpace (map ppa (Map.toList m))))
+  pp :: Bool -> TSType -> Doc
+  pp _ TBoolean = PP.text "boolean"
+  pp _ (TBooleanLiteral b) = if b then PP.text "true" else PP.text "false"
+  pp _ TNumber = PP.text "number"
+  pp b (TNumberLiteral n) = pp b n
+  pp _ TString = PP.text "string"
+  pp b (TStringLiteral s) = pp b $ "\"" ++ s ++ "\""
+  pp b (TArray t) = pp b t <> PP.text "[]"
+  pp b (TTuple ts) = PP.brackets (PP.sep (PP.punctuate PP.comma (map (pp b) ts)))
+  pp _ TBracket = PP.text "{}"
+  pp _ TObject = PP.text "object"
+  pp b (TTypeAlias n) = pp b n
+  pp b (TUserObject m) = PP.braces (PP.sep (PP.punctuate PP.comma (map ppa (Map.toList m))))
     where
-      ppa (s, v) = PP.text s <> (PP.colon <+> pp v)
-  pp TUnknown = PP.text "unknown"
-  pp TAny = PP.text "any"
-  pp TNever = PP.text "never"
-  pp TVoid = PP.text "void"
-  pp TNull = PP.text "null"
-  pp TUndefined = PP.text "undefined"
-  pp (TUnion ts) = PP.sep (PP.punctuate (PP.text " | ") (map pp ts))
-  pp (TIntersection ts) = PP.sep (PP.punctuate (PP.text " & ") (map pp ts))
+      ppa (s, v) = PP.text s <> (PP.colon <+> pp b v)
+  pp _ TUnknown = PP.text "unknown"
+  pp _ TAny = PP.text "any"
+  pp _ TNever = PP.text "never"
+  pp _ TVoid = PP.text "void"
+  pp _ TNull = PP.text "null"
+  pp _ TUndefined = PP.text "undefined"
+  pp b (TUnion ts) = PP.sep (PP.punctuate (PP.text " | ") (map (pp b) ts))
+  pp b (TIntersection ts) = PP.sep (PP.punctuate (PP.text " & ") (map (pp b) ts))
 
 isBase :: Expression -> Bool
 isBase Var {} = True
@@ -219,176 +225,181 @@ hasSpace Void = True
 hasSpace _ = False
 
 instance PP UopPrefix where
-  pp :: UopPrefix -> Doc
-  pp Not = PP.text "!"
-  pp BitNeg = PP.text "~"
-  pp TypeOf = PP.text "typeof"
-  pp Spread = PP.text "..."
-  pp DecPre = PP.text "--"
-  pp IncPre = PP.text "++"
-  pp PlusUop = PP.char '+'
-  pp MinusUop = PP.char '-'
-  pp Void = PP.text "void"
+  pp :: Bool -> UopPrefix -> Doc
+  pp _ Not = PP.text "!"
+  pp _ BitNeg = PP.text "~"
+  pp _ TypeOf = PP.text "typeof"
+  pp _ Spread = PP.text "..."
+  pp _ DecPre = PP.text "--"
+  pp _ IncPre = PP.text "++"
+  pp _ PlusUop = PP.char '+'
+  pp _ MinusUop = PP.char '-'
+  pp _ Void = PP.text "void"
 
 instance PP UopPostfix where
-  pp :: UopPostfix -> Doc
-  pp DecPost = PP.text "--"
-  pp IncPost = PP.text "++"
+  pp :: Bool -> UopPostfix -> Doc
+  pp _ DecPost = PP.text "--"
+  pp _ IncPost = PP.text "++"
 
 instance PP Bop where
-  pp :: Bop -> Doc
-  pp Assign = PP.equals
-  pp PlusBop = PP.char '+'
-  pp PlusAssign = PP.text "+="
-  pp MinusBop = PP.char '-'
-  pp MinusAssign = PP.text "-="
-  pp Times = PP.char '*'
-  pp TimesAssign = PP.text "*="
-  pp Div = PP.char '/'
-  pp DivAssign = PP.text "/="
-  pp Mod = PP.char '%'
-  pp ModAssign = PP.text "%="
-  pp Exp = PP.text "**"
-  pp ExpAssign = PP.text "**="
-  pp BitAnd = PP.char '&'
-  pp BitAndAssign = PP.text "&="
-  pp BitOr = PP.char '|'
-  pp BitOrAssign = PP.text "|="
-  pp BitXor = PP.char '^'
-  pp BitXorAssign = PP.text "^="
-  pp LeftShift = PP.text "<<"
-  pp LeftShiftAssign = PP.text "<<="
-  pp RightShift = PP.text ">>"
-  pp RightShiftAssign = PP.text ">>="
-  pp UnsignedRightShift = PP.text ">>>"
-  pp UnsignedRightShiftAssign = PP.text ">>>="
-  pp And = PP.text "&&"
-  pp AndAssign = PP.text "&&="
-  pp Or = PP.text "||"
-  pp OrAssign = PP.text "||="
-  pp NullishCoalescing = PP.text "??"
-  pp NullishCoalescingAssign = PP.text "??="
-  pp Eq = PP.text "=="
-  pp Neq = PP.text "!="
-  pp EqStrict = PP.text "==="
-  pp NeqStrict = PP.text "!=="
-  pp Gt = PP.char '>'
-  pp Ge = PP.text ">="
-  pp Lt = PP.char '<'
-  pp Le = PP.text "<="
-  pp In = PP.text "in"
-  pp InstanceOf = PP.text "instanceof"
+  pp :: Bool -> Bop -> Doc
+  pp _ Assign = PP.equals
+  pp _ PlusBop = PP.char '+'
+  pp _ PlusAssign = PP.text "+="
+  pp _ MinusBop = PP.char '-'
+  pp _ MinusAssign = PP.text "-="
+  pp _ Times = PP.char '*'
+  pp _ TimesAssign = PP.text "*="
+  pp _ Div = PP.char '/'
+  pp _ DivAssign = PP.text "/="
+  pp _ Mod = PP.char '%'
+  pp _ ModAssign = PP.text "%="
+  pp _ Exp = PP.text "**"
+  pp _ ExpAssign = PP.text "**="
+  pp _ BitAnd = PP.char '&'
+  pp _ BitAndAssign = PP.text "&="
+  pp _ BitOr = PP.char '|'
+  pp _ BitOrAssign = PP.text "|="
+  pp _ BitXor = PP.char '^'
+  pp _ BitXorAssign = PP.text "^="
+  pp _ LeftShift = PP.text "<<"
+  pp _ LeftShiftAssign = PP.text "<<="
+  pp _ RightShift = PP.text ">>"
+  pp _ RightShiftAssign = PP.text ">>="
+  pp _ UnsignedRightShift = PP.text ">>>"
+  pp _ UnsignedRightShiftAssign = PP.text ">>>="
+  pp _ And = PP.text "&&"
+  pp _ AndAssign = PP.text "&&="
+  pp _ Or = PP.text "||"
+  pp _ OrAssign = PP.text "||="
+  pp _ NullishCoalescing = PP.text "??"
+  pp _ NullishCoalescingAssign = PP.text "??="
+  pp _ Eq = PP.text "=="
+  pp _ Neq = PP.text "!="
+  pp _ EqStrict = PP.text "==="
+  pp _ NeqStrict = PP.text "!=="
+  pp _ Gt = PP.char '>'
+  pp _ Ge = PP.text ">="
+  pp _ Lt = PP.char '<'
+  pp _ Le = PP.text "<="
+  pp _ In = PP.text "in"
+  pp _ InstanceOf = PP.text "instanceof"
 
 instance PP Expression where
-  pp :: Expression -> Doc
-  pp (Var v) = pp v
-  pp (Lit l) = pp l
-  pp (AnnotatedExpression e t) = pp e <> (PP.colon <+> pp t)
-  pp (UnaryOpPrefix uop e) =
+  pp :: Bool -> Expression -> Doc
+  pp b (Var v) = pp b v
+  pp b (Lit l) = pp b l
+  pp False (AnnotatedExpression e _) = pp False e
+  pp b (AnnotatedExpression e t) = pp b e <> (PP.colon <+> pp b t)
+  pp b (UnaryOpPrefix uop e) =
     if hasSpace uop
-      then pp uop <+> if isBase e then pp e else PP.parens (pp e)
-      else pp uop <> if isBase e then pp e else PP.parens (pp e)
-  pp (UnaryOpPostfix e uop) = (if isBase e then pp e else PP.parens (pp e)) <> pp uop
-  pp e@(BinaryOp {}) = ppPrec 0 e
+      then pp b uop <+> if isBase e then pp b e else PP.parens (pp b e)
+      else pp b uop <> if isBase e then pp b e else PP.parens (pp b e)
+  pp b (UnaryOpPostfix e uop) = (if isBase e then pp b e else PP.parens (pp b e)) <> pp b uop
+  pp b e@(BinaryOp {}) = ppPrec 0 e
     where
       ppPrec n (BinaryOp e1 bop e2) =
         ppParens (level bop < n) $
-          ppPrec (level bop) e1 <+> pp bop <+> ppPrec (level bop + 1) e2
-      ppPrec _ e' = pp e'
+          ppPrec (level bop) e1 <+> pp b bop <+> ppPrec (level bop + 1) e2
+      ppPrec _ e' = pp b e'
       ppParens b = if b then PP.parens else id
-  pp (Array es) = PP.brackets (PP.hcat (PP.punctuate commaSpace (map pp es)))
+  pp b (Array es) = PP.brackets (PP.hsep (PP.punctuate PP.comma (map (pp b) es)))
 
-ppSS :: [Statement] -> Doc
-ppSS ss = PP.vcat (map pp ss)
+ppSS :: Bool -> [Statement] -> Doc
+ppSS b ss = PP.vcat (map (pp b) ss)
 
 instance PP Block where
-  pp :: Block -> Doc
-  pp (Block [s]) = pp s
-  pp (Block ss) = ppSS ss
+  pp :: Bool -> Block -> Doc
+  pp b (Block [s]) = pp b s
+  pp b (Block ss) = ppSS b ss
 
-isEmptyBlock :: Block -> Bool
-isEmptyBlock b = pp b == PP.empty
+isEmptyBlock :: Bool -> Block -> Bool
+isEmptyBlock t b = pp t b == PP.empty
 
 instance PP Statement where
-  pp :: Statement -> Doc
-  pp (AnyExpression e) = pp e <> PP.semi
-  pp (ConstAssignment v (AnnotatedExpression name e)) = (PP.text "const" <+> (pp v <> (PP.colon <+> pp name <+> PP.equals <+> pp e))) <> PP.semi
-  pp (ConstAssignment v e) = (PP.text "const" <+> pp v <+> PP.equals <+> pp e) <> PP.semi
-  pp (LetAssignment v (AnnotatedExpression name e)) = (PP.text "let" <+> (pp v <> (PP.colon <+> pp name <+> PP.equals <+> pp e))) <> PP.semi
-  pp (LetAssignment v e) = (PP.text "let" <+> pp v <+> PP.equals <+> pp e) <> PP.semi
-  pp (If [] elseBlock) =
+  pp :: Bool -> Statement -> Doc
+  pp b (AnyExpression e) = pp b e <> PP.semi
+  pp False (ConstAssignment v (AnnotatedExpression _ e)) = (PP.text "const" <+> pp False v <+> PP.equals <+> pp False e) <> PP.semi
+  pp b (ConstAssignment v (AnnotatedExpression name e)) = (PP.text "const" <+> (pp b v <> (PP.colon <+> pp b name <+> PP.equals <+> pp b e))) <> PP.semi
+  pp b (ConstAssignment v e) = (PP.text "const" <+> pp b v <+> PP.equals <+> pp b e) <> PP.semi
+  pp False (LetAssignment v e) = (PP.text "let" <+> pp False v <+> PP.equals <+> pp False e) <> PP.semi
+  pp b (LetAssignment v (AnnotatedExpression name e)) = (PP.text "let" <+> (pp b v <> (PP.colon <+> pp b name <+> PP.equals <+> pp b e))) <> PP.semi
+  pp b (LetAssignment v e) = (PP.text "let" <+> pp b v <+> PP.equals <+> pp b e) <> PP.semi
+  pp b (If [] elseBlock) =
     PP.text "if (false) {} else {"
-      PP.$$ PP.nest 2 (pp elseBlock)
+      PP.$$ PP.nest 2 (pp b elseBlock)
       PP.$$ PP.char '}'
-  pp (If ((cond, block) : rest) elseBlock) =
+  pp t (If ((cond, block) : rest) elseBlock) =
     ppIfChain (cond, block) rest elseBlock
     where
       ppIfChain :: (Expression, Block) -> [(Expression, Block)] -> Block -> Doc
       ppIfChain (c, b) [] elseBlk =
         -- No more conditions, just print if and optional else
-        PP.hang (PP.text "if" <+> PP.parens (pp c) <+> PP.char '{') 2 (pp b)
+        PP.hang (PP.text "if" <+> PP.parens (pp t c) <+> PP.char '{') 2 (pp t b)
           PP.$$ PP.char '}'
-            <> ( if not (isEmptyBlock elseBlk)
+            <> ( if not (isEmptyBlock t elseBlk)
                    then
                      PP.text " else {"
-                       PP.$$ PP.nest 2 (pp elseBlk)
+                       PP.$$ PP.nest 2 (pp t elseBlk)
                        PP.$$ PP.char '}'
                    else PP.empty
                )
       ppIfChain (c, b) ((c2, b2) : xs) elseBlk =
         -- Still have more conditions, print `if` then chain `else if`s
-        PP.hang (PP.text "if" <+> PP.parens (pp c) <+> PP.char '{') 2 (pp b)
+        PP.hang (PP.text "if" <+> PP.parens (pp t c) <+> PP.char '{') 2 (pp t b)
           PP.$$ PP.char '}'
             <> PP.text " else"
-            <> PP.hang (PP.text "if" <+> PP.parens (pp c2) <+> PP.char '{') 2 (pp b2)
+            <> PP.hang (PP.text "if" <+> PP.parens (pp t c2) <+> PP.char '{') 2 (pp t b2)
           PP.$$ PP.char '}'
             <> ppElseIfChain xs elseBlk
 
       ppElseIfChain :: [(Expression, Block)] -> Block -> Doc
       ppElseIfChain [] elseBlk =
-        if not (isEmptyBlock elseBlk)
+        if not (isEmptyBlock t elseBlk)
           then
             PP.text " else {"
-              PP.$$ PP.nest 2 (pp elseBlk)
+              PP.$$ PP.nest 2 (pp t elseBlk)
               PP.$$ PP.char '}'
           else PP.empty
       ppElseIfChain ((c, b) : xs) elseBlk =
         PP.text " else"
-          <> PP.hang (PP.text "if" <+> PP.parens (pp c) <+> PP.char '{') 2 (pp b)
+          <> PP.hang (PP.text "if" <+> PP.parens (pp t c) <+> PP.char '{') 2 (pp t b)
           PP.$$ PP.char '}'
             <> ppElseIfChain xs elseBlk
-  pp (For init guard update b) =
-    PP.hang (PP.text "for" <+> PP.parens (pp init <+> (pp guard <> (PP.semi <+> pp update))) <+> PP.char '{') 2 (pp b)
+  pp t (For init guard update b) =
+    PP.hang (PP.text "for" <+> PP.parens (pp t init <+> (pp t guard <> (PP.semi <+> pp t update))) <+> PP.char '{') 2 (pp t b)
       PP.$$ PP.char '}'
-  pp (While guard e) =
-    PP.hang (PP.text "while" <+> PP.parens (pp guard) <+> PP.char '{') 2 (pp e)
+  pp b (While guard e) =
+    PP.hang (PP.text "while" <+> PP.parens (pp b guard) <+> PP.char '{') 2 (pp b e)
       PP.$$ PP.char '}'
-  pp Break = PP.text "break" <> PP.semi
-  pp Continue = PP.text "continue" <> PP.semi
-  pp (Try b1 mbE b2 b3) =
-    PP.hang (PP.text "try {") 2 (pp b1)
+  pp _ Break = PP.text "break" <> PP.semi
+  pp _ Continue = PP.text "continue" <> PP.semi
+  pp b (Try b1 mbE b2 b3) =
+    PP.hang (PP.text "try {") 2 (pp b b1)
       PP.$$ PP.char '}'
         <> ( case mbE of
                Nothing -> PP.empty
                Just e ->
                  PP.text " catch ("
-                   <> pp e
+                   <> pp b e
                    <> PP.text ") {"
-                   PP.$$ PP.nest 2 (pp b2)
+                   PP.$$ PP.nest 2 (pp b b2)
                    PP.$$ PP.char '}'
            )
-        <> ( if isEmptyBlock b3
+        <> ( if isEmptyBlock b b3
                then PP.empty
                else
                  PP.text " finally {"
-                   PP.$$ PP.nest 2 (pp b3)
+                   PP.$$ PP.nest 2 (pp b b3)
                    PP.$$ PP.char '}'
            )
-  pp (Return Nothing) = PP.text "return" <> PP.semi
-  pp (Return (Just e)) = (PP.text "return" <+> pp e) <> PP.semi
-  pp (TypeAlias n t) = (PP.text "type" <+> pp n <+> PP.equals <+> pp t) <> PP.semi
-  pp (InterfaceDeclaration n t) = (PP.text "interface" <+> pp n <+> PP.equals <+> pp t) <> PP.semi
-  pp Empty = PP.empty
+  pp _ (Return Nothing) = PP.text "return" <> PP.semi
+  pp b (Return (Just e)) = (PP.text "return" <+> pp b e) <> PP.semi
+  pp False (TypeAlias _ _) = PP.empty
+  pp b (TypeAlias n t) = (PP.text "type" <+> pp b n <+> PP.equals <+> pp b t) <> PP.semi
+  pp False (InterfaceDeclaration _ _) = PP.empty
+  pp b (InterfaceDeclaration n t) = (PP.text "interface" <+> pp b n <+> PP.equals <+> pp b t) <> PP.semi
+  pp _ Empty = PP.empty
 
 level :: Bop -> Int
 level b = case b of

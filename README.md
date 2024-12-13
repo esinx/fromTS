@@ -27,7 +27,6 @@
 │   ├── TSNumber.hs -- Number type utilities
 │   ├── TSParser.hs -- Parser for TypeScript
 │   ├── TSSyntax.hs -- TypeScript AST types
-│   ├── TSTranspiler.hs -- Transpiler using pretty printer
 │   ├── TSType.hs -- Type data types
 │   ├── TSTypeChecker.hs -- Type checker
 │   └── fromTS.hs -- Main functions for the program

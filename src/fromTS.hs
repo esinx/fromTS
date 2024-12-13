@@ -4,7 +4,6 @@ import Data.Map
 import TSError (Error (SyntaxError, TypeError))
 import TSParser
 import TSSyntax
-import TSTranspiler
 import TSType
 import TSTypeChecker (typeCheckProgram)
 import Prelude
