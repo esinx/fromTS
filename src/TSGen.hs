@@ -214,3 +214,13 @@ sampleStat = QC.sample' (arbitrary :: Gen Statement) >>= mapM_ (print . pp)
 
 quickCheckN :: (QC.Testable prop) => Int -> prop -> IO ()
 quickCheckN n = QC.quickCheckWith $ QC.stdArgs {QC.maxSuccess = n, QC.maxSize = 100}
+
+newtype Filename = Filename String
+  deriving (Show)
+
+instance Arbitrary Filename where
+  arbitrary :: Gen Filename
+  arbitrary = Filename <$> QC.listOf1 (QC.elements ['a' .. 'z'])
+
+  shrink :: Filename -> [Filename]
+  shrink (Filename s) = []
