@@ -451,6 +451,7 @@ baseTypeP =
         TVoid <$ stringIsoP "void",
         TNull <$ stringIsoP "null",
         TUndefined <$ stringIsoP "undefined",
+        TObject <$ stringIsoP "object",
         TTuple <$> brackets (typeP `P.sepEndBy` stringP ","),
         -- TArray <$ stringIsoP "Array" *> abrackets typeP,
         TBracket <$ braces (pure ()),

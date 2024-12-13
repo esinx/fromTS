@@ -11,7 +11,15 @@ data Number
   | Infinity
   | NInfinity
   | NaN
-  deriving (Eq, Show)
+  deriving (Show)
+
+instance Eq Number where
+  (==) :: Number -> Number -> Bool
+  (==) (Double d) (Double e) = abs (d - e) < 1e-8
+  (==) Infinity Infinity = True
+  (==) NInfinity NInfinity = True
+  (==) NaN NaN = True
+  (==) _ _ = False
 
 instance Arbitrary Number where
   arbitrary :: Gen Number
