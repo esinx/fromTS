@@ -207,13 +207,13 @@ instance Arbitrary Literal where
   shrink (ObjectLiteral m) = ObjectLiteral <$> shrinkMapExpr m
 
 sampleVar :: IO ()
-sampleVar = QC.sample' (arbitrary :: Gen Var) >>= mapM_ (print . pp)
+sampleVar = QC.sample' (arbitrary :: Gen Var) >>= mapM_ (print . pp True)
 
 sampleExp :: IO ()
-sampleExp = QC.sample' (arbitrary :: Gen Expression) >>= mapM_ (print . pp)
+sampleExp = QC.sample' (arbitrary :: Gen Expression) >>= mapM_ (print . pp True)
 
 sampleStat :: IO ()
-sampleStat = QC.sample' (arbitrary :: Gen Statement) >>= mapM_ (print . pp)
+sampleStat = QC.sample' (arbitrary :: Gen Statement) >>= mapM_ (print . pp True)
 
 quickCheckN :: (QC.Testable prop) => Int -> prop -> IO ()
 quickCheckN n = QC.quickCheckWith $ QC.stdArgs {QC.maxSuccess = n, QC.maxSize = 100}
