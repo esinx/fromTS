@@ -162,8 +162,8 @@ instance Arbitrary Expression where
     e
       : [AnnotatedExpression t' e | t' <- shrink t]
       ++ [AnnotatedExpression t e' | e' <- shrink e]
-  shrink (UnaryOpPrefix o e) = e : [e]
-  shrink (UnaryOpPostfix e o) = e : [e]
+  shrink (UnaryOpPrefix o e) = [e]
+  shrink (UnaryOpPostfix e o) = [e]
   shrink (BinaryOp e1 o e2) = [e1, e2]
   shrink (Array es) = Array <$> shrink es
 

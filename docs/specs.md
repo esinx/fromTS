@@ -102,8 +102,8 @@ const arr2: string[] = ["Hello", "World"];
 -   Escape characters in strings
 -   Destructuring
 -   Support for "let x;" and "let x: number;" (without assignment)
--   Types with arbitrary string keys. E.g:
 -   Limited built-in type support (only has `Array.prototype.length` for now)
+-   Types with arbitrary string keys. E.g:
 
 ```typescript
 const test123: {

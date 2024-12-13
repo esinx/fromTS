@@ -705,7 +705,6 @@ ifP = do
 
 -- | Primitive, Greedy
 -- TODO: support `for (;;) {}` (e.g. empty expressions/statements)
--- TODO: remove function call statement and treat as expression
 forAssignmentP :: Parser Statement
 forAssignmentP =
   tryChoice [constAssignmentP, letAssignmentP, AnyExpression <$> expP]
@@ -746,7 +745,7 @@ tryP = do
       [ -- Attempt to parse catch + optional finally
         do
           _ <- stringIsoP "catch"
-          e <- P.option Nothing (Just <$> parens expP)
+          e <- P.optional (parens expP)
           cblock <- braces blockP
           fblock <- P.option (Block []) (stringIsoP "finally" *> braces blockP)
           return (e, cblock, fblock),
@@ -764,14 +763,6 @@ returnP = do
   _ <- stringIsoP "return"
   e <- optional expP
   return (Return e)
-
--- | Non-Primitive, Greedy
-functionDeclarationP :: Parser Statement
-functionDeclarationP = undefined
-
--- | Non-Primitive, Greedy
-functionCallP :: Parser Statement
-functionCallP = undefined
 
 -- | Non-Primitive, Greedy
 typeAliasP :: Parser Statement
@@ -808,8 +799,6 @@ statementP =
       tryP <* optional (stringP ";"),
       returnP <* optional (stringP ";"),
       AnyExpression <$> expP <* optional (stringP ";"),
-      -- functionDeclarationP <* optional (stringP ";"),
-      -- functionCallP <* optional (stringP ";"),
       emptyP
     ]
 
