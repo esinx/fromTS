@@ -35,12 +35,9 @@ data Statement
   | Try Block (Maybe Expression) Block Block -- try { s1 } catch (e) { s2 } finally { s3 }
   | Return (Maybe Expression)
   | FunctionDeclaration Expression -- I was thinking of using this as a wrapper of FunctionExpression?
-  -- I think we need some way to parse stuff like this (type annotations and optional parameters + unwrapping):
-  -- type Obj = {
-  --   x: number,
-  --   y?: number
-  -- };
   | FunctionCall Expression -- f(e1, ..., en)
+  | TypeAlias Name TSType
+  | InterfaceDeclaration Name TSType
   | Empty
   deriving (Eq, Show)
 
@@ -127,8 +124,6 @@ data Bop
   | InstanceOf -- `instanceof`
   deriving (Eq, Show, Enum, Bounded)
 
-type Name = String
-
 data Var
   = Name Name -- x, global variable
   | Dot Expression Name -- t.x
@@ -202,7 +197,10 @@ instance PP TSType where
   pp (TTuple ts) = PP.brackets (PP.hcat (PP.punctuate PP.comma (map pp ts)))
   pp TBracket = PP.text "{}"
   pp TObject = PP.text "object"
-  pp (TUserObject m) = undefined
+  pp (TTypeAlias n) = pp n
+  pp (TUserObject m) = PP.braces (PP.sep (PP.punctuate PP.comma (map ppa (Map.toList m))))
+    where
+      ppa (s, v) = PP.text s <> (PP.colon <+> pp v)
   pp (TFunction ts t) = undefined
   pp TUnknown = PP.text "unknown"
   pp TAny = PP.text "any"
@@ -404,6 +402,8 @@ instance PP Statement where
   pp (Return (Just e)) = PP.text "return" <+> pp e
   pp (FunctionDeclaration e) = undefined
   pp (FunctionCall e) = undefined
+  pp (TypeAlias n t) = PP.text "type" <+> pp n <+> PP.equals <+> pp t
+  pp (InterfaceDeclaration n t) = PP.text "interface" <+> pp n <+> PP.equals <+> pp t
   pp Empty = PP.empty
 
 level :: Bop -> Int

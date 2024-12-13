@@ -89,3 +89,28 @@ try {
 // };
 
 // for (fn(); fn(); ) {}
+
+// const test123: {
+//     [key: string]: string;
+// } = {
+//     test: "test",
+// };
+
+type MyType = number | string | boolean;
+
+const test: MyType = 5;
+
+type MyType2 = {
+    "test field": 5;
+    field1: number;
+    field2?: string;
+    field3: boolean | MyType;
+    field4: (number | (MyType2 | MyType))[];
+};
+
+interface MyType3 {
+    field1: number;
+    field2: string;
+    field3?: boolean | MyType;
+    field4?: number | (MyType2 | MyType)[];
+}

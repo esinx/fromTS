@@ -6,6 +6,7 @@ import Data.Char qualified as Char
 import Data.Functor
 import Data.List (foldl')
 import Data.List.NonEmpty qualified as NE
+import Data.Map (fromList)
 import Data.Set (singleton)
 import Data.Void (Void)
 import System.IO qualified as IO
@@ -317,9 +318,107 @@ literalP =
 
 --------------------------------------------------------------------------------
 
+reserved :: [String]
+reserved =
+  [ -- Reserved Words
+    "break",
+    "case",
+    "catch",
+    "class",
+    "const",
+    "continue",
+    "debugger",
+    "default",
+    "delete",
+    "do",
+    "else",
+    "enum",
+    "export",
+    "extends",
+    "false",
+    "finally",
+    "for",
+    "function",
+    "if",
+    "import",
+    "in",
+    "instanceof",
+    "new",
+    "null",
+    "return",
+    "super",
+    "switch",
+    "this",
+    "throw",
+    "true",
+    "try",
+    "typeof",
+    "var",
+    "void",
+    "while",
+    "with",
+    -- Strict Mode Reserved Words
+    "as",
+    "implements",
+    "interface",
+    "let",
+    "package",
+    "private",
+    "protected",
+    "public",
+    "static",
+    "yield",
+    -- Contextual Keywords
+    "any",
+    "boolean",
+    "constructor",
+    "declare",
+    "get",
+    "module",
+    "require",
+    "number",
+    "set",
+    "string",
+    "symbol",
+    "type",
+    "from",
+    "of"
+  ]
+
 -- | Primitive, Greedy
-primaryTypeP :: Parser TSType
-primaryTypeP =
+nameP :: Parser Name
+nameP =
+  wsP $
+    filterPMessage
+      (`notElem` reserved)
+      ((:) <$> (P.letterChar <|> P.char '_' <|> P.char '$') <*> many nameCharP)
+      "Cannot use reserved word as variable name"
+
+-- >>> parse (many nameP) "x sfds $test_this he$_lo o9kay _ 9bad from but-not-this"
+-- Right ["x","sfds","$test_this","he$_lo","o9kay","_"]
+
+--------------------------------------------------------------------------------
+
+-- | Primitive, Greedy
+propertyP :: Parser (String, TSType)
+propertyP = P.try $ do
+  key <- stringValP <|> nameP
+  isOpt <- optional (stringP "?")
+  stringP ":"
+  tp <- typeP
+  let finalTp = case isOpt of
+        Just _ -> TUnion [tp, TUndefined]
+        Nothing -> tp
+  return (key, finalTp)
+
+-- | Primitive, Greedy
+objectTypeP :: Parser TSType
+objectTypeP = TUserObject . fromList <$> braces (propertyP `P.sepEndBy` (stringP ";" <|> (wsP P.newline $> ())))
+
+-- | Primitive, Greedy
+-- TODO: Add function
+baseTypeP :: Parser TSType
+baseTypeP =
   wsP $
     tryChoice
       [ TBooleanLiteral <$> boolValP,
@@ -340,10 +439,26 @@ primaryTypeP =
         TNull <$ stringIsoP "null",
         TUndefined <$ stringIsoP "undefined",
         TTuple <$> brackets (typeP `P.sepBy` stringP ","),
-        TArray <$ stringIsoP "Array" *> abrackets typeP,
-        TArray <$> primaryTypeP <* brackets (pure ()),
-        parens typeP
+        -- TArray <$ stringIsoP "Array" *> abrackets typeP,
+        -- TBracket <$ braces (pure ()),
+        objectTypeP,
+        TTypeAlias <$> nameP
       ]
+
+-- | Non-Primitive, Greedy
+parseArrays :: TSType -> Parser TSType
+parseArrays base =
+  ( do
+      brackets (pure ())
+      parseArrays (TArray base)
+  )
+    <|> return base
+
+-- | Non-Primitive, Greedy
+primaryTypeP :: Parser TSType
+primaryTypeP = wsP $ do
+  base <- P.try baseTypeP <|> parens typeP
+  parseArrays base
 
 -- | Primitive, Greedy
 intersectionTypeP :: Parser TSType
@@ -430,85 +545,6 @@ bopP =
 -- Right [PlusBop,Ge]
 -- >>> parse (many bopP) "|| >>= +   <= - //  \n== % * <<===> >"
 -- Right [Or,RightShiftAssign,PlusBop,Le,MinusBop,Div,Div,Eq,Mod,Times,LeftShiftAssign,Eq,Gt,Gt]
-
-reserved :: [String]
-reserved =
-  [ -- Reserved Words
-    "break",
-    "case",
-    "catch",
-    "class",
-    "const",
-    "continue",
-    "debugger",
-    "default",
-    "delete",
-    "do",
-    "else",
-    "enum",
-    "export",
-    "extends",
-    "false",
-    "finally",
-    "for",
-    "function",
-    "if",
-    "import",
-    "in",
-    "instanceof",
-    "new",
-    "null",
-    "return",
-    "super",
-    "switch",
-    "this",
-    "throw",
-    "true",
-    "try",
-    "typeof",
-    "var",
-    "void",
-    "while",
-    "with",
-    -- Strict Mode Reserved Words
-    "as",
-    "implements",
-    "interface",
-    "let",
-    "package",
-    "private",
-    "protected",
-    "public",
-    "static",
-    "yield",
-    -- Contextual Keywords
-    "any",
-    "boolean",
-    "constructor",
-    "declare",
-    "get",
-    "module",
-    "require",
-    "number",
-    "set",
-    "string",
-    "symbol",
-    "type",
-    "from",
-    "of"
-  ]
-
--- | Primitive, Greedy
-nameP :: Parser Name
-nameP =
-  wsP $
-    filterPMessage
-      (`notElem` reserved)
-      ((:) <$> (P.letterChar <|> P.char '_' <|> P.char '$') <*> many nameCharP)
-      "Cannot use reserved word as variable name"
-
--- >>> parse (many nameP) "x sfds $test_this he$_lo o9kay _ 9bad from but-not-this"
--- Right ["x","sfds","$test_this","he$_lo","o9kay","_"]
 
 -- | Primitive, Greedy
 varP :: Parser Var
@@ -726,6 +762,21 @@ functionCallP :: Parser Statement
 functionCallP = undefined
 
 -- | Non-Primitive, Greedy
+typeAliasP :: Parser Statement
+typeAliasP = do
+  stringIsoP "type"
+  n <- nameP
+  stringP "="
+  TypeAlias n <$> typeP
+
+-- | Non-Primitive, Greedy
+interfaceP :: Parser Statement
+interfaceP = do
+  stringIsoP "interface"
+  n <- nameP
+  InterfaceDeclaration n <$> objectTypeP
+
+-- | Non-Primitive, Greedy
 emptyP :: Parser Statement
 emptyP = Empty <$ stringP ";"
 
@@ -733,7 +784,9 @@ emptyP = Empty <$ stringP ";"
 statementP :: Parser Statement
 statementP =
   tryChoice
-    [ constAssignmentP <* optional (stringP ";"),
+    [ typeAliasP <* optional (stringP ";"),
+      interfaceP <* optional (stringP ";"),
+      constAssignmentP <* optional (stringP ";"),
       letAssignmentP <* optional (stringP ";"),
       ifP <* optional (stringP ";"),
       forP <* optional (stringP ";"),

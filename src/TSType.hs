@@ -14,6 +14,8 @@ import Test.QuickCheck (Arbitrary (..), Gen)
 import Test.QuickCheck qualified as QC
 import Prelude
 
+type Name = String
+
 type TSVarEnv = [Map String TSType]
 
 type TSUserTypeEnv = [Map String TSType]
@@ -38,6 +40,7 @@ data TSType
   | TTuple [TSType] -- [T, U, ...]
   | TBracket -- {}
   | TObject -- object
+  | TTypeAlias Name -- type alias
   | TUserObject (Map String TSType)
   | TFunction [TSType] TSType
   | TUnknown -- proper top
