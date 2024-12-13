@@ -207,28 +207,44 @@ instance PP TSTypeWrapper where
 
 instance PP TSType where
   pp :: Bool -> TSType -> Doc
-  pp _ TBoolean = PP.text "boolean"
-  pp _ (TBooleanLiteral b) = if b then PP.text "true" else PP.text "false"
-  pp _ TNumber = PP.text "number"
-  pp b (TNumberLiteral n) = pp b n
-  pp _ TString = PP.text "string"
-  pp b (TStringLiteral s) = pp b $ "\"" ++ s ++ "\""
-  pp b (TArray t) = pp b t <> PP.text "[]"
-  pp b (TTuple ts) = PP.brackets (PP.sep (PP.punctuate PP.comma (map (pp b) ts)))
-  pp _ TBracket = PP.text "{}"
-  pp _ TObject = PP.text "object"
-  pp b (TTypeAlias n) = pp b n
-  pp b (TUserObject m) = PP.braces (PP.space <> PP.sep (PP.punctuate PP.comma (map ppa (Map.toList m))) <> PP.space)
+  pp b ty = ppPrec 0 b ty
     where
-      ppa (s, v) = PP.text s <> (PP.colon <+> pp b v)
-  pp _ TUnknown = PP.text "unknown"
-  pp _ TAny = PP.text "any"
-  pp _ TNever = PP.text "never"
-  pp _ TVoid = PP.text "void"
-  pp _ TNull = PP.text "null"
-  pp _ TUndefined = PP.text "undefined"
-  pp b (TUnion ts) = PP.sep (PP.punctuate (PP.text " |") (map (pp b) ts))
-  pp b (TIntersection ts) = PP.sep (PP.punctuate (PP.text " &") (map (pp b) ts))
+      ppPrec :: Int -> Bool -> TSType -> Doc
+      ppPrec _ _ TBoolean = PP.text "boolean"
+      ppPrec _ _ (TBooleanLiteral b) = if b then PP.text "true" else PP.text "false"
+      ppPrec _ _ TNumber = PP.text "number"
+      ppPrec _ b (TNumberLiteral n) = pp b n
+      ppPrec _ _ TString = PP.text "string"
+      ppPrec _ b (TStringLiteral s) = pp b $ "\"" ++ s ++ "\""
+      ppPrec _ b (TTuple ts) = PP.brackets (PP.sep (PP.punctuate PP.comma (map (pp b) ts)))
+      ppPrec _ _ TBracket = PP.text "{}"
+      ppPrec _ _ TObject = PP.text "object"
+      ppPrec _ b (TTypeAlias n) = pp b n
+      ppPrec _ b (TUserObject m) = PP.braces (PP.space <> PP.sep (PP.punctuate PP.comma (map ppa (Map.toList m))) <> PP.space)
+        where
+          ppa (s, v) = PP.text s <> (PP.colon <+> pp b v)
+      ppPrec _ _ TUnknown = PP.text "unknown"
+      ppPrec _ _ TAny = PP.text "any"
+      ppPrec _ _ TNever = PP.text "never"
+      ppPrec _ _ TVoid = PP.text "void"
+      ppPrec _ _ TNull = PP.text "null"
+      ppPrec _ _ TUndefined = PP.text "undefined"
+      ppPrec n b (TArray t) =
+        let prec = precedence (TArray t)
+            childDoc = ppPrec prec b t
+            doc = childDoc <> PP.text "[]"
+         in ppParens (prec < n) doc
+      ppPrec n b (TUnion ts) =
+        let prec = precedence (TUnion ts)
+            docs = map (ppPrec (prec + 1) b) ts
+            doc = PP.sep (PP.punctuate (PP.text " |") docs)
+         in ppParens (prec < n) doc
+      ppPrec n b (TIntersection ts) =
+        let prec = precedence (TIntersection ts)
+            docs = map (ppPrec (prec + 1) b) ts
+            doc = PP.sep (PP.punctuate (PP.text " &") docs)
+         in ppParens (prec < n) doc
+      ppParens b = if b then PP.parens else id
 
 isBase :: Expression -> Bool
 isBase Var {} = True
@@ -463,3 +479,9 @@ level b = case b of
   Div -> 13
   Mod -> 13
   Exp -> 14
+
+precedence :: TSType -> Int
+precedence TUnion {} = 1
+precedence TIntersection {} = 2
+precedence TArray {} = 3
+precedence _ = 4

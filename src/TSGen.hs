@@ -79,6 +79,18 @@ genAnnotatedExp n = QC.oneof [AnnotatedExpression <$> arbitrary <*> genExp n, ge
 genCatch :: Gen Expression
 genCatch = QC.oneof [Var . Name <$> genName, AnnotatedExpression <$> arbitrary <*> (Var . Name <$> genName)]
 
+-- | Generate a statement to be used as first argument of for loop
+genForStatement :: Int -> Gen Statement
+genForStatement n | n <= 1 = ConstAssignment <$> genVar 0 <*> genExp 0
+genForStatement n =
+  QC.frequency
+    [ (1, (ConstAssignment . Name <$> genName) <*> genAnnotatedExp n'),
+      (1, (LetAssignment . Name <$> genName) <*> genAnnotatedExp n'),
+      (n, AnyExpression <$> genExp n')
+    ]
+  where
+    n' = n `div` 2
+
 -- | Generate a size-controlled statement
 genStatement :: Int -> Gen Statement
 genStatement n | n <= 1 = ConstAssignment <$> genVar 0 <*> genExp 0
@@ -100,7 +112,7 @@ genStatement n =
           <*> genBlock n'
           <*> genBlock n'
       ),
-      (n', For <$> genStatement n' <*> genExp n' <*> genExp n' <*> genBlock n')
+      (n', For <$> genForStatement n' <*> genExp n' <*> genExp n' <*> genBlock n')
     ]
   where
     n' = n `div` 2
