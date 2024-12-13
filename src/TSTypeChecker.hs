@@ -266,8 +266,6 @@ typeCheckExpr' _ (BinaryOp e1 op e2) = typeCheckBinaryOp e1 op e2
 typeCheckExpr' _ (Array es) = do
   ts <- traverse (typeCheckExpr' False) es
   return $ TArray $ simplify (TUnion ts)
--- TODO: functions
-typeCheckExpr' _ _ = undefined
 
 -- | typechecks an expression
 typeCheckExpr :: Expression -> TSTypeChecker TSType

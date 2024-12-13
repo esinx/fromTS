@@ -73,6 +73,8 @@ genStatement n =
       (1, return Empty),
       (1, return Break),
       (1, return Continue),
+      (1, TypeAlias <$> genName <*> arbitrary),
+      (1, InterfaceDeclaration <$> genName <*> arbitrary),
       (n, AnyExpression <$> genExp n'),
       (n, If <$> QC.vectorOf 3 ((,) <$> genExp n' <*> genBlock n') <*> genBlock n'),
       -- generate loops half as frequently as if statements
@@ -128,6 +130,8 @@ instance Arbitrary Statement where
       ++ [Try b maybeE' catchBlock finallyBlock | maybeE' <- shrink maybeE]
       ++ [Try b maybeE catchBlock' finallyBlock | catchBlock' <- shrink catchBlock]
       ++ [Try b maybeE catchBlock finallyBlock' | finallyBlock' <- shrink finallyBlock]
+  shrink (TypeAlias n t) = [TypeAlias n' t | n' <- shrink n] ++ [TypeAlias n t' | t' <- shrink t]
+  shrink (InterfaceDeclaration n t) = [InterfaceDeclaration n' t | n' <- shrink n] ++ [InterfaceDeclaration n t' | t' <- shrink t]
   shrink (Return e) = [Return e' | e' <- shrink e]
   shrink Empty = []
   shrink Break = []
