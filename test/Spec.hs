@@ -40,21 +40,21 @@ matchTypeMap truthTypeMap typeMap =
 main :: IO ()
 main = do
   -- typechecker
-  -- putStrLn "test_model"
-  -- runTestTT test_model
-  -- runTestTT test_typeChecker
-  -- putStrLn "subtypeReflexive"
-  -- quickCheckN 100 prop_subtypeReflexive
-  -- putStrLn "properBottomTypeNever"
-  -- quickCheckN 100 prop_properBottomTypeNever
-  -- putStrLn "properTopTypeUnknown"
-  -- quickCheckN 100 prop_properTopTypeUnknown
-  -- putStrLn "chaoticTopTypeAny"
-  -- quickCheckN 100 prop_chaoticTopTypeAny
-  -- putStrLn "chaoticBottomTypeAny"
-  -- quickCheckN 100 prop_chaoticBottomTypeAny
-  -- putStrLn "transitiveExceptAny"
-  -- quickCheckN 100 prop_transitiveExceptAny
+  putStrLn "test_model"
+  runTestTT test_model
+  runTestTT test_typeChecker
+  putStrLn "subtypeReflexive"
+  quickCheckN 100 prop_subtypeReflexive
+  putStrLn "properBottomTypeNever"
+  quickCheckN 100 prop_properBottomTypeNever
+  putStrLn "properTopTypeUnknown"
+  quickCheckN 100 prop_properTopTypeUnknown
+  putStrLn "chaoticTopTypeAny"
+  quickCheckN 100 prop_chaoticTopTypeAny
+  putStrLn "chaoticBottomTypeAny"
+  quickCheckN 100 prop_chaoticBottomTypeAny
+  putStrLn "transitiveExceptAny"
+  quickCheckN 100 prop_transitiveExceptAny
   putStrLn "differential"
   quickCheckN 20 prop_differential
   putStrLn "--- All tests complete ---"

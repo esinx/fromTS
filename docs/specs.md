@@ -103,6 +103,7 @@ const arr2: string[] = ["Hello", "World"];
 -   Destructuring
 -   Support for "let x;" and "let x: number;" (without assignment)
 -   Types with arbitrary string keys. E.g:
+-   Limited built-in type support (only has `Array.prototype.length` for now)
 
 ```typescript
 const test123: {

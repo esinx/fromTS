@@ -187,7 +187,7 @@ instance PP Literal where
   pp _ UndefinedLiteral = PP.text "undefined"
   pp b (ObjectLiteral m) = PP.braces (PP.space <> PP.sep (PP.punctuate PP.comma (map ppa (Map.toList m))) <> PP.space)
     where
-      ppa (s, v) = PP.text s <> (PP.colon <+> pp b v)
+      ppa (s, v) = PP.text ("\"" ++ s ++ "\"") <> (PP.colon <+> pp b v)
 
 instance PP TSType where
   pp :: Bool -> TSType -> Doc

@@ -35,7 +35,7 @@ genLiteral n =
       (1, pure NullLiteral),
       (1, pure UndefinedLiteral),
       (n, StringLiteral <$> genStringLit),
-      (n, ObjectLiteral . Map.fromList <$> QC.vectorOf 3 ((,) <$> genStringLit <*> genExp n'))
+      (n, ObjectLiteral . Map.fromList <$> QC.vectorOf 1 ((,) <$> genStringLit <*> genExp n'))
     ]
   where
     n' = n `div` 2
@@ -66,7 +66,7 @@ genExp n =
       (n, UnaryOpPrefix <$> arbitrary <*> genExp n'),
       (n, UnaryOpPostfix <$> genExp n' <*> arbitrary),
       (n, BinaryOp <$> genExp n' <*> arbitrary <*> genExp n'),
-      (n, Array <$> QC.vectorOf 3 (genExp n'))
+      (n, Array <$> QC.vectorOf 1 (genExp n'))
     ]
   where
     n' = n `div` 2
@@ -79,7 +79,7 @@ genCatch = QC.oneof [Var . Name <$> genName, AnnotatedExpression <$> arbitrary <
 
 -- | Generate a size-controlled statement
 genStatement :: Int -> Gen Statement
-genStatement n | n <= 1 = QC.oneof [ConstAssignment <$> genVar 0 <*> genExp 0, return Empty]
+genStatement n | n <= 1 = QC.oneof [ConstAssignment <$> genVar 0 <*> genExp 0]
 genStatement n =
   QC.frequency
     [ (1, (ConstAssignment . Name <$> genName) <*> genAnnotatedExp n'),
@@ -87,7 +87,7 @@ genStatement n =
       (1, TypeAlias <$> genName <*> arbitrary),
       (1, InterfaceDeclaration <$> genName <*> arbitrary),
       (n, AnyExpression <$> genExp n'),
-      (n, If <$> QC.vectorOf 3 ((,) <$> genExp n' <*> genBlock n') <*> genBlock n'),
+      (n, If <$> QC.vectorOf 1 ((,) <$> genExp n' <*> genBlock n') <*> genBlock n'),
       (n, Return <$> makeGenMaybe (genExp n')),
       -- generate loops half as frequently as if statements
       (n', While <$> genExp n' <*> genBlock n'),

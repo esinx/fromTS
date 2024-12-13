@@ -337,10 +337,14 @@ typeCheckStmt (Try tryBlock (Just (Var (Name n))) catchBlock finallyBlock) toRet
   comp
 typeCheckStmt (Try tryBlock _ catchBlock _) toReturn comp =
   throwError $ TypeError "expected identifier in catch block"
-typeCheckStmt (Return (Just e)) toReturn comp = do
-  t <- typeCheckExpr e
+typeCheckStmt (Return maybeExp) toReturn comp = do
   case toReturn of
-    Just t' -> if isSubtype t t' then comp else throwError $ TypeError "type mismatch"
+    Just t' -> do
+      case maybeExp of
+        Just e -> do
+          t <- typeCheckExpr e
+          if isSubtype t t' then comp else throwError $ TypeError "type mismatch"
+        Nothing -> if isSubtype TVoid t' then comp else throwError $ TypeError "type mismatch"
     Nothing -> throwError $ TypeError "cannot return in this context"
 -- TODO: functions
 typeCheckStmt (TypeAlias n t) _ comp =
