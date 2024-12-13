@@ -391,6 +391,13 @@ lookupVarType name = do
     Just t -> return t
     Nothing -> throwError $ TypeError $ "Variable " ++ name ++ " not found in the environment"
 
+lookupUserType :: String -> TSTypeChecker TSType
+lookupUserType name = do
+  env <- ask
+  case foldr (\m acc -> Map.lookup name m <|> acc) Nothing (userTypeEnvs env) of -- TODO: check if this impl shadows correctly
+    Just t -> return t
+    Nothing -> throwError $ TypeError $ "Type " ++ name ++ " not found in the environment"
+
 lookupObjectType :: String -> TSTypeChecker TSType
 lookupObjectType name = do
   env <- ask
