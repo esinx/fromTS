@@ -315,7 +315,9 @@ ppSS ss = PP.vcat (map pp ss)
 instance PP Statement where
   pp :: Statement -> Doc
   pp (AnyExpression e) = pp e
+  pp (ConstAssignment v (AnnotatedExpression name e)) = PP.text "const" <+> (pp v <> (PP.colon <+> pp name <+> PP.equals <+> pp e))
   pp (ConstAssignment v e) = PP.text "const" <+> pp v <+> PP.equals <+> pp e
+  pp (LetAssignment v (AnnotatedExpression name e)) = PP.text "let" <+> (pp v <> (PP.colon <+> pp name <+> PP.equals <+> pp e))
   pp (LetAssignment v e) = PP.text "let" <+> pp v <+> PP.equals <+> pp e
   pp (If [] elseBlock) =
     PP.text "if (false) {} else {"
