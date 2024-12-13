@@ -106,7 +106,6 @@ isSubtype t1 t2 = isSubtype' (simplify t1) (simplify t2)
 
 -- | checks if a type is a subtype of another type
 isSubtype' :: TSType -> TSType -> Bool
-isSubtype' (TNumberLiteral n1) (TNumberLiteral n2) = abs (n1 - n2) < 0.001
 -- reflexivity
 isSubtype' t1 t2 | t1 == t2 = True
 isSubtype' (TNumberLiteral d) (TNumberLiteral e) = abs (d - e) < 1e-9
