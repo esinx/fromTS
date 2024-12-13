@@ -14,25 +14,17 @@ import TSParser (parseTSFile)
 
 main :: IO ()
 main = do
-  -- res <- parseTSFile "./playground/typescript-ast-parser/literals-simple.ts"
-  res <- parseTSFile "./playground/typescript-ast-parser/literals-simple.ts"
-  case res of
-    Right ts -> print ts
-    Left err -> print err
+  args <- Env.getArgs
+  case args of
+    [filename] -> do
+      result <- fromTSFile filename
+      case result of
+        Right js -> print js
+        Left err -> print err
+    _ -> putStrLn "Usage: fromTS <filename>"
 
--- main :: IO ()
--- main = do
---   args <- Env.getArgs
---   case args of
---     [filename] -> do
---       result <- fromTSFile filename
---       case result of
---         Right js -> print js
---         Left err -> print err
---     _ -> putStrLn "Usage: fromTS <filename>"
-
--- fromTSFile :: String -> IO (Either TSError.Error String)
--- fromTSFile filename = do
---   handle <- IO.openFile filename IO.ReadMode
---   str <- IO.hGetContents handle
---   pure $ fromTS str
+fromTSFile :: String -> IO (Either TSError.Error String)
+fromTSFile filename = do
+  handle <- IO.openFile filename IO.ReadMode
+  str <- IO.hGetContents handle
+  fromTS str
