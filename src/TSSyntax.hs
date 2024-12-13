@@ -137,6 +137,9 @@ pretty = PP.render . pp
 oneLine :: (PP a) => a -> String
 oneLine = PP.renderStyle (PP.style {PP.mode = PP.OneLineMode}) . pp
 
+commaSpace :: Doc
+commaSpace = PP.text ", "
+
 instance PP Bool where
   pp :: Bool -> Doc
   pp True = PP.text "true"
@@ -176,7 +179,7 @@ instance PP Literal where
   pp (BooleanLiteral b) = pp b
   pp NullLiteral = PP.text "null"
   pp UndefinedLiteral = PP.text "undefined"
-  pp (ObjectLiteral m) = PP.braces (PP.sep (PP.punctuate PP.comma (map ppa (Map.toList m))))
+  pp (ObjectLiteral m) = PP.braces (PP.sep (PP.punctuate commaSpace (map ppa (Map.toList m))))
     where
       ppa (s, v) = PP.text s <> (PP.colon <+> pp v)
 
@@ -189,11 +192,11 @@ instance PP TSType where
   pp TString = PP.text "string"
   pp (TStringLiteral s) = pp $ "\"" ++ s ++ "\""
   pp (TArray t) = pp t <> PP.text "[]"
-  pp (TTuple ts) = PP.brackets (PP.hcat (PP.punctuate PP.comma (map pp ts)))
+  pp (TTuple ts) = PP.brackets (PP.hcat (PP.punctuate commaSpace (map pp ts)))
   pp TBracket = PP.text "{}"
   pp TObject = PP.text "object"
   pp (TTypeAlias n) = pp n
-  pp (TUserObject m) = PP.braces (PP.sep (PP.punctuate PP.comma (map ppa (Map.toList m))))
+  pp (TUserObject m) = PP.braces (PP.sep (PP.punctuate commaSpace (map ppa (Map.toList m))))
     where
       ppa (s, v) = PP.text s <> (PP.colon <+> pp v)
   pp (TFunction ts t) = undefined
@@ -294,7 +297,7 @@ instance PP Expression where
           ppPrec (level bop) e1 <+> pp bop <+> ppPrec (level bop + 1) e2
       ppPrec _ e' = pp e'
       ppParens b = if b then PP.parens else id
-  pp (Array es) = PP.brackets (PP.hcat (PP.punctuate PP.comma (map pp es)))
+  pp (Array es) = PP.brackets (PP.hcat (PP.punctuate commaSpace (map pp es)))
 
 ppSS :: [Statement] -> Doc
 ppSS ss = PP.vcat (map pp ss)
@@ -356,7 +359,7 @@ instance PP Statement where
           PP.$$ PP.char '}'
             <> ppElseIfChain xs elseBlk
   pp (For init guard update b) =
-    PP.hang (PP.text "for" <+> PP.parens (pp init <> (PP.semi <+> (pp guard <> (PP.semi <+> pp update)))) <+> PP.char '{') 2 (pp b)
+    PP.hang (PP.text "for" <+> PP.parens (pp init <+> (pp guard <> (PP.semi <+> pp update))) <+> PP.char '{') 2 (pp b)
       PP.$$ PP.char '}'
   pp (While guard e) =
     PP.hang (PP.text "while" <+> PP.parens (pp guard) <+> PP.char '{') 2 (pp e)
