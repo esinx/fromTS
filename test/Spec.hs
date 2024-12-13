@@ -57,7 +57,7 @@ main = do
   putStrLn "transitiveExceptAny"
   quickCheckN 100 prop_transitiveExceptAny
   putStrLn "differential"
-  quickCheckN 20 prop_differential
+  quickCheckN 1000 prop_differential
   putStrLn "--- All tests complete ---"
 
 -- unit tests for the typechecker
