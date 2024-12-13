@@ -31,7 +31,11 @@ const getInputFileNames = async () => {
 
 const main = async () => {
 	const fileNames = await getInputFileNames()
-	const program = ts.createProgram(fileNames, {})
+	const program = ts.createProgram(fileNames, {
+		target: ts.ScriptTarget.ES2016,
+		strict: true,
+		alwaysStrict: true,
+	})
 	const typeChecker = program.getTypeChecker()
 	const buildTypeAscList = (node: ts.Node): [string, string][] => {
 		if (ts.isVariableDeclaration(node)) {

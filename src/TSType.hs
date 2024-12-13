@@ -74,6 +74,33 @@ simplify (TIntersection ts) = simplifyIntersections (TIntersection ts) False
     simplifyIntersections t _ = t
 simplify t = t
 
+-- | checks if a type is Truthy
+isTruthy :: TSType -> Maybe Bool
+isTruthy (TBooleanLiteral b) = return b
+-- TODO: NaN is falsy
+isTruthy (TNumberLiteral n) = return $ n /= 0
+isTruthy (TStringLiteral s) = return $ not $ null s
+isTruthy TNull = return False
+isTruthy TUndefined = return False
+isTruthy TNever = return False
+isTruthy (TArray _) = return True
+isTruthy (TTuple _) = return True
+isTruthy TBracket = return True
+isTruthy TObject = return True
+isTruthy (TUserObject _) = return True
+isTruthy (TFunction _ _) = return True
+isTruthy (TUnion ts) =
+  let ts' = map isTruthy ts
+   in if Nothing `elem` ts'
+        then Nothing
+        else return $ all (== Just False) ts'
+isTruthy (TIntersection ts) =
+  let ts' = map isTruthy ts
+   in if Nothing `elem` ts'
+        then Nothing
+        else return $ elem (Just True) ts'
+isTruthy _ = Nothing
+
 isSubtype :: TSType -> TSType -> Bool
 isSubtype t1 t2 = isSubtype' (simplify t1) (simplify t2)
 
@@ -182,10 +209,6 @@ genStringLitType = escape <$> QC.listOf (QC.elements stringLitChars)
     stringLitChars :: [Char]
     stringLitChars = filter (\c -> c /= '\"' && (Char.isSpace c || Char.isPrint c)) ['\NUL' .. '~']
 
-genMap :: Int -> (Int -> Gen TSType) -> Gen (Map String TSType)
-genMap 0 _ = return Map.empty
-genMap n gen = Map.fromList <$> QC.vectorOf 2 ((,) <$> genNameType <*> gen n)
-
 -- types without data (except TAny and TNever)
 basicTypes :: [TSType]
 basicTypes =
@@ -200,6 +223,25 @@ basicTypes =
     TUndefined
   ]
 
+genMap :: Int -> Gen (Map String TSType)
+genMap 0 = return Map.empty
+genMap n = Map.fromList <$> QC.vectorOf 2 ((,) <$> genNameType <*> genMapType n)
+
+genMapType :: Int -> Gen TSType
+genMapType 0 =
+  QC.elements basicTypes
+genMapType n =
+  QC.frequency
+    [ (n, TArray <$> genMapType n'),
+      (n, TTuple <$> QC.vectorOf 3 (genMapType n')),
+      (n, TUserObject <$> genMap n'),
+      (n, TFunction <$> QC.vectorOf 2 (genMapType n') <*> genMapType n'),
+      (n, TUnion <$> QC.vectorOf 3 (genMapType n')),
+      (n, TIntersection <$> QC.vectorOf 3 (genMapType n'))
+    ]
+  where
+    n' = n `div` 2
+
 genType :: Int -> Gen TSType
 genType 0 =
   QC.elements $
@@ -211,7 +253,7 @@ genType n =
       (1, TStringLiteral <$> genStringLitType),
       (n, TArray <$> genType n'),
       (n, TTuple <$> QC.vectorOf 3 (genType n')),
-      (n, TUserObject <$> genMap n' genType),
+      (n, TUserObject <$> genMap n'),
       (n, TFunction <$> QC.vectorOf 2 (genType n') <*> genType n'),
       (n, TUnion <$> QC.vectorOf 3 (genType n')),
       (n, TIntersection <$> QC.vectorOf 3 (genType n'))
@@ -230,7 +272,7 @@ genTypeExceptNever n =
       (1, TStringLiteral <$> genStringLitType),
       (n, TArray <$> genTypeExceptNever n'),
       (n, TTuple <$> QC.vectorOf 3 (genTypeExceptNever n')),
-      (n, TUserObject <$> genMap n' genTypeExceptNever),
+      (n, TUserObject <$> genMap n'),
       (n, TFunction <$> QC.vectorOf 2 (genTypeExceptNever n') <*> genTypeExceptNever n'),
       (n, TUnion <$> QC.vectorOf 3 (genTypeExceptNever n')),
       (n, TIntersection <$> QC.vectorOf 3 (genTypeExceptNever n'))
@@ -249,7 +291,7 @@ genTypeExceptAny n =
       (1, TStringLiteral <$> genStringLitType),
       (n, TArray <$> genTypeExceptAny n'),
       (n, TTuple <$> QC.vectorOf 3 (genTypeExceptAny n')),
-      (n, TUserObject <$> genMap n' genTypeExceptAny),
+      (n, TUserObject <$> genMap n'),
       (n, TFunction <$> QC.vectorOf 2 (genTypeExceptAny n') <*> genTypeExceptAny n'),
       (n, TUnion <$> QC.vectorOf 3 (genTypeExceptAny n')),
       (n, TIntersection <$> QC.vectorOf 3 (genTypeExceptAny n'))

@@ -4,6 +4,7 @@ import Control.Monad.State qualified as S
 import Data.Aeson qualified as JSON
 import Data.ByteString.Lazy.UTF8 as BLU
 import Data.Map as Map
+import Debug.Trace
 import GHC.IO (unsafePerformIO)
 import GHC.IO.Exception (ExitCode (ExitFailure, ExitSuccess))
 import Model
@@ -247,28 +248,40 @@ test_typeCheckProg =
           ~?= Left (TypeError "type mismatch")
       ]
 
+compareToModel :: String -> IO Bool
+compareToModel fileName = do
+  result <-
+    runModelTypeChecker fileName
+  parsed <- parseTSFile fileName
+  case (result, parsed) of
+    (Nothing, _) -> return False
+    (Just truthTypeMap, Right ts) ->
+      case typeCheckProgram ts of
+        Left _ -> return False
+        Right typeMap ->
+          Debug.Trace.traceShow (truthTypeMap, typeMap) $
+            return $
+              matchTypeMap truthTypeMap typeMap
+    (_, Left err) ->
+      Debug.Trace.traceShow err $
+        return False
+
 test_model :: Test
 test_model =
   "model based tests"
     ~: TestList
     $ fmap
       (\fileName -> fileName ~: p fileName)
-      [ "./test/const-literals.ts",
-        "./test/variables.ts"
+      [ -- "./test/const-literals.ts",
+        -- "./test/variables.ts"
+        -- "./test/object.ts",
+        "./test/bfs.ts"
       ]
   where
     p :: String -> IO ()
     p fileName = do
-      result <-
-        runModelTypeChecker fileName
-      parsed <- parseTSFile fileName
-      case (result, parsed) of
-        (Nothing, _) -> Test.HUnit.assert False
-        (Just truthTypeMap, Right ts) ->
-          case typeCheckProgram ts of
-            Left _ -> Test.HUnit.assert False
-            Right typeMap -> Test.HUnit.assert $ matchTypeMap truthTypeMap typeMap
-        (_, Left err) -> Test.HUnit.assert False
+      result <- compareToModel fileName
+      assertBool fileName result
 
 -- properties for the typechecker
 prop_subtypeReflexive :: TSType -> Bool
@@ -318,32 +331,8 @@ prop_differential = ioProperty . prop_ioDifferential
 
 prop_ioDifferential :: Block -> IO Property
 prop_ioDifferential b =
-  let outputFile = "test/output.ts"
-      typeCheckResult = typeCheckProgram b
+  let outputFile = "test/temp.ts"
    in do
         writeFile outputFile $ pretty b
-        result <-
-          readProcessWithExitCode
-            "node"
-            ["./model/dist/index.js", outputFile]
-            []
-        return $ property $ match result typeCheckResult
-  where
-    match :: (ExitCode, String, String) -> Either Error (Map String TSType) -> Bool
-    match (ExitSuccess, stdout, _) (Right typeMap) =
-      let truthTypeMap = JSON.decode $ BLU.fromString stdout :: Maybe (Map String String)
-       in case truthTypeMap of
-            Just tm ->
-              let entries = Map.toAscList typeMap
-               in all
-                    ( \(name, t) ->
-                        case Map.lookup name tm of
-                          Just t' -> case parse typeP t' of
-                            Right t'' -> t =.= t''
-                            Left _ -> False
-                          Nothing -> False
-                    )
-                    entries
-            Nothing -> False
-    match (ExitFailure _, _, _) (Left _) = True
-    match _ _ = False
+        result <- compareToModel outputFile
+        return $ property result

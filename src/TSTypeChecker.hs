@@ -8,6 +8,7 @@ import Control.Monad.State qualified as S
 import Data.Functor
 import Data.List qualified as List
 import Data.Map qualified as Map
+import Foreign.C (e2BIG)
 import GHC.IO (unsafePerformIO)
 import Safe (atMay)
 import TSError
@@ -104,21 +105,148 @@ typeCheckBinaryOp (Var v) Assign e = do
   t2 <- typeCheckExpr e
   if isSubtype t2 t1 then return t2 else throwError $ TypeError "type mismatch"
 -- t1 == t2
-typeCheckBinaryOp e1 Eq e2 = do
+typeCheckBinaryOp e1 op e2
+  | op `elem` [Eq, Neq] = do
+      t1 <- typeCheckExpr e1
+      t2 <- typeCheckExpr e2
+      if isSubtype t1 t2 || isSubtype t2 t1
+        then return TBoolean
+        else throwError $ TypeError "type mismatch"
+typeCheckBinaryOp e1 op e2
+  | op `elem` [EqStrict, NeqStrict] = do
+      t1 <- typeCheckExpr e1
+      t2 <- typeCheckExpr e2
+      -- TODO: there are some cases (e.g. 1 == {}) where 1 is technically a subtype
+      -- of {}, but we should throw error in this case. however, it seems like
+      -- we are not going to parse {} as type {}/ Object but instead as object literal.
+      -- there are also cases like:
+      --          const x = 1;
+      --          const y = {};
+      --          x == y; // does not error
+      -- where if we parse {} as object literal instead of type {}, then it will error...
+      if t1 =.= t2
+        then return TBoolean
+        else throwError $ TypeError "type mismatch"
+typeCheckBinaryOp e1 op e2
+  | op `elem` [Lt, Gt, Le, Ge] = do
+      t1 <- typeCheckExpr e1
+      t2 <- typeCheckExpr e2
+      case (t1, t2) of
+        (TNumber, TNumber) -> return TBoolean
+        (TNumberLiteral _, TNumber) -> return TBoolean
+        (TNumber, TNumberLiteral _) -> return TBoolean
+        (TNumberLiteral _, TNumberLiteral _) -> return TBoolean
+        (TBoolean, TBoolean) -> return TBoolean
+        (TBooleanLiteral _, TBoolean) -> return TBoolean
+        (TBoolean, TBooleanLiteral _) -> return TBoolean
+        (TBooleanLiteral _, TBooleanLiteral _) -> return TBoolean
+        (TString, TString) -> return TBoolean
+        (TStringLiteral _, TString) -> return TBoolean
+        (TString, TStringLiteral _) -> return TBoolean
+        (TStringLiteral _, TStringLiteral _) -> return TBoolean
+        (TArray _, TArray _) -> return TBoolean
+        (TTuple _, TArray _) -> return TBoolean
+        (TUserObject _, TUserObject _) -> return TBoolean
+        (TObject, TObject) -> return TBoolean
+        (TAny, TAny) -> return TBoolean
+        _ -> throwError $ TypeError "expected number or string type"
+typeCheckBinaryOp e1 In e2 = do
+  t2 <- typeCheckExpr e2
+  case t2 of
+    TArray _ -> return TBoolean
+    TTuple _ -> return TBoolean
+    TUserObject _ -> return TBoolean
+    TObject -> return TBoolean
+    TAny -> return TBoolean
+    _ -> throwError $ TypeError "expected object or array type"
+typeCheckBinaryOp e1 InstanceOf e2 = do
+  t2 <- typeCheckExpr e2
+  case t2 of
+    TObject -> return TBoolean
+    TUserObject _ -> return TBoolean
+    _ -> throwError $ TypeError "expected object type"
+typeCheckBinaryOp e1 PlusBop e2 = do
   t1 <- typeCheckExpr e1
   t2 <- typeCheckExpr e2
-  -- TODO: there are some cases (e.g. 1 == {}) where 1 is technically a subtype
-  -- of {}, but we should throw error in this case. however, it seems like
-  -- we are not going to parse {} as type {}/ Object but instead as object literal.
-  -- there are also cases like:
-  --          const x = 1;
-  --          const y = {};
-  --          x == y; // does not error
-  -- where if we parse {} as object literal instead of type {}, then it will error...
-  if isSubtype t1 t2 || isSubtype t2 t1
-    then return TBoolean
-    else throwError $ TypeError "type mismatch"
-typeCheckBinaryOp _ _ _ = undefined
+  if isSubtype t1 TString || isSubtype t2 TString
+    then return TString
+    else
+      if isSubtype t1 TNumber && isSubtype t2 TNumber
+        then return TNumber
+        else throwError $ TypeError "expected string or number type"
+typeCheckBinaryOp (Var v) PlusAssign e = do
+  t1 <- typeCheckVar v
+  t2 <- typeCheckExpr e
+  if isSubtype t1 TString || isSubtype t2 TString
+    then return TString
+    else
+      if isSubtype t1 TNumber && isSubtype t2 TNumber
+        then return TNumber
+        else throwError $ TypeError "expected string or number type"
+typeCheckBinaryOp e1 And e2 =
+  do
+    t1 <- typeCheckExpr e1
+    t2 <- typeCheckExpr e2
+    case (isTruthy t1, isTruthy t2) of
+      (Just True, _) -> return t2
+      (Just False, _) -> return t1
+      _ -> return $ TUnion [t1, t2]
+typeCheckBinaryOp e1 op e2
+  | op `elem` [Or, NullishCoalescing] =
+      do
+        t1 <- typeCheckExpr e1
+        t2 <- typeCheckExpr e2
+        case (isTruthy t1, isTruthy t2) of
+          (Just True, _) -> return t1
+          (Just False, _) -> return t2
+          _ -> return $ TUnion [t1, t2]
+typeCheckBinaryOp e1 NullishCoalescingAssign e2 =
+  do
+    t1 <- typeCheckExpr e1
+    t2 <- typeCheckExpr e2
+    case isTruthy t1 of
+      Just True -> return t1
+      Just False -> return t2
+      _ -> return $ TUnion [t1, t2]
+typeCheckBinaryOp e1 op e2
+  | op
+      `elem` [ MinusBop,
+               Times,
+               Div,
+               Mod,
+               Exp,
+               BitAnd,
+               BitOr,
+               BitXor,
+               LeftShift,
+               RightShift,
+               UnsignedRightShift
+             ] = do
+      t1 <- typeCheckExpr e1
+      t2 <- typeCheckExpr e2
+      if isSubtype t1 TNumber && isSubtype t2 TNumber
+        then return TNumber
+        else throwError $ TypeError "expected number type"
+typeCheckBinaryOp (Var v) op e
+  | op
+      `elem` [ MinusAssign,
+               TimesAssign,
+               DivAssign,
+               ModAssign,
+               ExpAssign,
+               BitAndAssign,
+               BitOrAssign,
+               BitXorAssign,
+               LeftShiftAssign,
+               RightShiftAssign,
+               UnsignedRightShiftAssign
+             ] = do
+      t1 <- typeCheckVar v
+      t2 <- typeCheckExpr e
+      if isSubtype t1 TNumber && isSubtype t2 TNumber
+        then return TNumber
+        else throwError $ TypeError "expected number type"
+typeCheckBinaryOp _ _ _ = throwError $ TypeError "unsupported binary operation"
 
 -- | typechecks an expression, first argument indicate if we want to get the literal type
 typeCheckExpr' :: Bool -> Expression -> TSTypeChecker TSType

@@ -191,10 +191,10 @@ tsx@^4.19.2:
   optionalDependencies:
     fsevents "~2.3.3"
 
-typescript@^5.7.2:
-  version "5.7.2"
-  resolved "https://registry.yarnpkg.com/typescript/-/typescript-5.7.2.tgz#3169cf8c4c8a828cde53ba9ecb3d2b1d5dd67be6"
-  integrity sha512-i5t66RHxDvVN40HfDd1PsEThGNnlMCMT3jMUuoh9/0TaqWevNontacunWyN02LA9/fIbEWlcHZcgTKb9QoaLfg==
+typescript@^5.8.0:
+  version "5.8.0-dev.20241212"
+  resolved "https://registry.yarnpkg.com/typescript/-/typescript-5.8.0-dev.20241212.tgz#752c36f48afbc792a2ee9a16643e1bb01cf3e8f6"
+  integrity sha512-DL+rd76Ze4iHIFTT6+f8SNdxkTYnR0cy6e0QRljOfyr2s0TrO2L9pAOB1dJnSizTAjxou7lIRpUWwxVOIyiMWg==
 
 undici-types@~6.20.0:
   version "6.20.0"
