@@ -252,6 +252,12 @@ typeCheckBinaryOp (Var v) op e
         else throwError $ TypeError "expected number type"
 typeCheckBinaryOp _ _ _ = throwError $ TypeError "unsupported binary operation"
 
+findActualType :: TSType -> TSTypeChecker TSType
+findActualType (TTypeAlias n) = do
+  t <- lookupUserType n
+  findActualType t
+findActualType t = return t
+
 -- | typechecks an expression, first argument indicate if we want to get the literal type
 typeCheckExpr' :: Bool -> Expression -> TSTypeChecker TSType
 typeCheckExpr' getLiteralType (Lit l) =
@@ -259,6 +265,7 @@ typeCheckExpr' getLiteralType (Lit l) =
 typeCheckExpr' _ (Var v) = typeCheckVar v
 typeCheckExpr' _ (AnnotatedExpression t e) = do
   e' <- typeCheckExpr e
+  t <- findActualType t
   if isSubtype e' t then return t else throwError $ TypeError "type mismatch"
 typeCheckExpr' _ (UnaryOpPrefix op e) = do
   t <- typeCheckExpr e
@@ -292,39 +299,40 @@ typeCheckStmt (If condBlocks elseBlock) toReturn comp = do
     ( \(condBlock, block) -> do
         t <- typeCheckExpr condBlock
         if isSubtype t TBoolean || isSubtype t TNumber -- TODO: not sure if more things should be allowed
-          then createNewVarEnv $ typeCheckBlock block toReturn
+          then createNewUserTypeEnv $ createNewVarEnv $ typeCheckBlock block toReturn
           else throwError $ TypeError "expected boolean type"
     )
     condBlocks
-  _ <- createNewVarEnv $ typeCheckBlock elseBlock toReturn
+  _ <- createNewUserTypeEnv $ createNewVarEnv $ typeCheckBlock elseBlock toReturn
   comp
 typeCheckStmt (For varInit guard incr block) toReturn comp = do
   _ <-
-    createNewVarEnv $
-      typeCheckStmt
-        varInit
-        Nothing
-        ( do
-            t <- typeCheckExpr guard
-            if isSubtype t TBoolean || isSubtype t TNumber -- TODO: not sure if more things should be allowed
-              then do
-                _ <- typeCheckExpr incr
-                typeCheckBlock block toReturn
-              else throwError $ TypeError "expected boolean type"
-        )
+    createNewUserTypeEnv $
+      createNewVarEnv $
+        typeCheckStmt
+          varInit
+          Nothing
+          ( do
+              t <- typeCheckExpr guard
+              if isSubtype t TBoolean || isSubtype t TNumber -- TODO: not sure if more things should be allowed
+                then do
+                  _ <- typeCheckExpr incr
+                  typeCheckBlock block toReturn
+                else throwError $ TypeError "expected boolean type"
+          )
   comp
 typeCheckStmt (While e block) toReturn comp = do
   t <- typeCheckExpr e
   if isSubtype t TBoolean || isSubtype t TNumber -- TODO: not sure if more things should be allowed
     then do
-      _ <- createNewVarEnv $ typeCheckBlock block toReturn
+      _ <- createNewUserTypeEnv $ createNewVarEnv $ typeCheckBlock block toReturn
       comp
     else throwError $ TypeError "expected boolean type"
 typeCheckStmt Break _ comp = comp
 typeCheckStmt Continue _ comp = comp
 typeCheckStmt (Try tryBlock (Just (Var (Name n))) catchBlock finallyBlock) toReturn comp = do
   _ <- typeCheckBlock tryBlock toReturn
-  _ <- putVarEnv n TAny (createNewVarEnv $ typeCheckBlock catchBlock toReturn)
+  _ <- putVarEnv n TAny (createNewUserTypeEnv $ createNewVarEnv $ typeCheckBlock catchBlock toReturn)
   _ <- typeCheckBlock finallyBlock toReturn
   comp
 typeCheckStmt (Try tryBlock _ catchBlock _) toReturn comp =
@@ -339,6 +347,10 @@ typeCheckStmt (Return Nothing) toReturn comp = do
     Just t' -> if isSubtype t' (TUnion [TVoid, TUndefined]) then comp else throwError $ TypeError "type mismatch"
     Nothing -> comp
 -- TODO: functions
+typeCheckStmt (TypeAlias n t) _ comp =
+  updateUserTypeEnv n t comp
+typeCheckStmt (InterfaceDeclaration n t) _ comp =
+  updateUserTypeEnv n t comp
 typeCheckStmt Empty _ comp = comp
 typeCheckStmt _ _ _ = undefined
 
