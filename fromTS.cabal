@@ -52,6 +52,7 @@ library
       TSSyntax
       TSError
       TSParser
+      TSTranspiler
       TSTypeChecker
       TSType
       Model
