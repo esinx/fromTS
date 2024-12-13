@@ -248,7 +248,7 @@ test_typeCheckProg =
               ]
           )
           ~?= Left (TypeError "type mismatch"),
-        -- let x = -1;
+        -- const x = -1;
         typeCheckProgram
           ( Block
               [ ConstAssignment
@@ -256,7 +256,19 @@ test_typeCheckProg =
                   (UnaryOpPrefix MinusUop (Lit (NumberLiteral (Double 1))))
               ]
           )
-          ~?= Right (Map.fromList [("x", TNumberLiteral (-1))])
+          ~?= Right (Map.fromList [("x", TNumberLiteral (-1))]),
+        typeCheckProgram
+          ( Block
+              [ TypeAlias
+                  "X"
+                  (TSTypeWrapper (TUnion [TNumber, TString])),
+                ConstAssignment
+                  (Name "x")
+                  (AnnotatedExpression (TSTypeWrapper (TTypeAlias "X")) (Lit (NumberLiteral (Double 1)))),
+                AnyExpression (BinaryOp (Var (Name "x")) Assign (Lit (StringLiteral "hi")))
+              ]
+          )
+          ~?= Right (Map.fromList [("x", TTypeAlias "X")])
       ]
 
 compareToModel :: String -> IO Bool
