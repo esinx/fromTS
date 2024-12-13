@@ -81,10 +81,16 @@ typeCheckUnaryOpPrefix BitNeg t
   | isSubtype t TNumber = return TNumber
   | otherwise = throwError $ TypeError "expected number type"
 typeCheckUnaryOpPrefix TypeOf _ = return TString
-typeCheckUnaryOpPrefix Spread t = return $ TArray t
+typeCheckUnaryOpPrefix Spread t@(TArray _) = return $ TArray t
+typeCheckUnaryOpPrefix Spread t@TObject = return t
+typeCheckUnaryOpPrefix Spread _ = throwError $ TypeError "expected array or object type"
+typeCheckUnaryOpPrefix DecPre (TNumberLiteral n) =
+  throwError $ TypeError "cannot decrement number literal"
 typeCheckUnaryOpPrefix DecPre t
   | isSubtype t TNumber = return TNumber
   | otherwise = throwError $ TypeError "expected number type"
+typeCheckUnaryOpPrefix IncPre (TNumberLiteral n) =
+  throwError $ TypeError "cannot increment number literal"
 typeCheckUnaryOpPrefix IncPre t
   | isSubtype t TNumber = return TNumber
   | otherwise = throwError $ TypeError "expected number type"
@@ -97,9 +103,13 @@ typeCheckUnaryOpPrefix MinusUop t
 typeCheckUnaryOpPrefix Void _ = return TUndefined
 
 typeCheckUnaryOpPostfix :: UopPostfix -> TSType -> TSTypeChecker TSType
+typeCheckUnaryOpPostfix DecPost (TNumberLiteral n) =
+  throwError $ TypeError "cannot decrement number literal"
 typeCheckUnaryOpPostfix DecPost t
   | isSubtype t TNumber = return TNumber
   | otherwise = throwError $ TypeError "expected number type"
+typeCheckUnaryOpPostfix IncPost (TNumberLiteral n) =
+  throwError $ TypeError "cannot increment number literal"
 typeCheckUnaryOpPostfix IncPost t
   | isSubtype t TNumber = return TNumber
   | otherwise = throwError $ TypeError "expected number type"
