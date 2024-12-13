@@ -19,6 +19,13 @@ import TSType
 import TSTypeChecker
 import Test.HUnit
 import Test.QuickCheck
+  ( Property,
+    Testable (property),
+    forAll,
+    ioProperty,
+    sized,
+    (==>),
+  )
 import Prelude
 
 matchTypeMap :: Map String TSType -> Map String TSType -> Bool
@@ -267,12 +274,15 @@ compareToModel' source =
     let parsed = parseTSSource source
     hClose handle
     case (result, parsed) of
-      (Nothing, Left _) -> return True
-      (Nothing, _) -> return False
       (Just truthTypeMap, Right ts) ->
         case typeCheckProgram ts of
           Left _ -> return False
           Right typeMap -> return $ matchTypeMap truthTypeMap typeMap
+      (Nothing, Left _) -> return True
+      (Nothing, Right ts) ->
+        case typeCheckProgram ts of
+          Left _ -> return True
+          Right _ -> return False
       (_, Left err) -> return False
 
 test_model :: Test
