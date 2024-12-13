@@ -35,8 +35,16 @@ const main = async () => {
 		target: ts.ScriptTarget.ES2016,
 		strict: true,
 		alwaysStrict: true,
+		noImplicitAny: true,
 	})
 	const typeChecker = program.getTypeChecker()
+	// check if typechecker errors
+	const allDiagnostic = ts.getPreEmitDiagnostics(program)
+	if (allDiagnostic.length > 0) {
+		console.log("Error in typechecker")
+		console.log(allDiagnostic)
+		return
+	}
 	const buildTypeAscList = (node: ts.Node): [string, string][] => {
 		if (ts.isVariableDeclaration(node)) {
 			const type = typeChecker.getTypeAtLocation(node)
