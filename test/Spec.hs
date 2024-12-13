@@ -198,7 +198,7 @@ test_typeCheckProg =
                         [ LetAssignment (Name "x") (Lit (StringLiteral "hi")),
                           LetAssignment
                             (Name "y")
-                            (AnnotatedExpression TString (Var (Name "x")))
+                            (AnnotatedExpression (TSTypeWrapper TString) (Var (Name "x")))
                         ]
                     )
                   ]
@@ -216,7 +216,7 @@ test_typeCheckProg =
                       Block
                         [ LetAssignment
                             (Name "y")
-                            (AnnotatedExpression TString (Var (Name "x")))
+                            (AnnotatedExpression (TSTypeWrapper TString) (Var (Name "x")))
                         ]
                     )
                   ]
@@ -244,7 +244,7 @@ test_typeCheckProg =
                   (Lit (BooleanLiteral True)),
                 LetAssignment
                   (Name "y")
-                  (AnnotatedExpression TString (Var (Name "x")))
+                  (AnnotatedExpression (TSTypeWrapper TString) (Var (Name "x")))
               ]
           )
           ~?= Left (TypeError "type mismatch"),

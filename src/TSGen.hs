@@ -87,7 +87,7 @@ genStatement n =
     [ (1, (ConstAssignment . Name <$> genName) <*> genAnnotatedExp n'),
       (1, (LetAssignment . Name <$> genName) <*> genAnnotatedExp n'),
       (1, TypeAlias <$> genName <*> arbitrary),
-      (1, InterfaceDeclaration <$> genName <*> genObjectType 1),
+      (1, InterfaceDeclaration <$> genName <*> (TSTypeWrapper <$> genObjectType 1)),
       (n, AnyExpression <$> genExp n'),
       (n, If <$> QC.vectorOf 1 ((,) <$> genExp n' <*> genBlock n') <*> genBlock n'),
       (n, Return <$> makeGenMaybe (genExp n')),
@@ -182,6 +182,10 @@ instance Arbitrary Bop where
 instance Arbitrary Literal where
   arbitrary :: Gen Literal
   arbitrary = QC.sized genLiteral
+
+instance Arbitrary TSTypeWrapper where
+  arbitrary :: Gen TSTypeWrapper
+  arbitrary = TSTypeWrapper <$> arbitrary
 
 sampleVar :: IO ()
 sampleVar = QC.sample' (arbitrary :: Gen Var) >>= mapM_ (print . pp True)

@@ -12,6 +12,12 @@ import Test.QuickCheck qualified as QC
 import Text.PrettyPrint (Doc, (<+>))
 import Text.PrettyPrint qualified as PP
 
+newtype TSTypeWrapper = TSTypeWrapper TSType
+  deriving (Show)
+
+instance Eq TSTypeWrapper where
+  TSTypeWrapper t1 == TSTypeWrapper t2 = t1 =.= t2
+
 newtype Block = Block [Statement]
   deriving (Eq, Show)
 
@@ -34,15 +40,15 @@ data Statement
   | Continue
   | Try Block (Maybe Expression) Block Block -- try { s1 } catch (e) { s2 } finally { s3 }
   | Return (Maybe Expression)
-  | TypeAlias Name TSType
-  | InterfaceDeclaration Name TSType
+  | TypeAlias Name TSTypeWrapper
+  | InterfaceDeclaration Name TSTypeWrapper
   | Empty
   deriving (Eq, Show)
 
 data Expression
   = Var Var -- global variables x and table indexing
   | Lit Literal -- literal values
-  | AnnotatedExpression TSType Expression -- e : type
+  | AnnotatedExpression TSTypeWrapper Expression -- e : type
   | UnaryOpPrefix UopPrefix Expression -- unary operators
   | UnaryOpPostfix Expression UopPostfix -- unary operators
   | BinaryOp Expression Bop Expression -- binary operators
@@ -194,6 +200,10 @@ instance PP Literal where
   pp b (ObjectLiteral m) = PP.braces (PP.space <> PP.sep (PP.punctuate PP.comma (map ppa (Map.toList m))) <> PP.space)
     where
       ppa (s, v) = PP.text ("\"" ++ s ++ "\"") <> (PP.colon <+> pp b v)
+
+instance PP TSTypeWrapper where
+  pp :: Bool -> TSTypeWrapper -> Doc
+  pp b (TSTypeWrapper t) = pp b t
 
 instance PP TSType where
   pp :: Bool -> TSType -> Doc

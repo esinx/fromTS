@@ -255,7 +255,7 @@ typeCheckExpr' :: Bool -> Expression -> TSTypeChecker TSType
 typeCheckExpr' getLiteralType (Lit l) =
   if getLiteralType then typeCheckConstLiteral l else typeCheckLiteral l
 typeCheckExpr' _ (Var v) = typeCheckVar v
-typeCheckExpr' _ (AnnotatedExpression t e) = do
+typeCheckExpr' _ (AnnotatedExpression (TSTypeWrapper t) e) = do
   e' <- typeCheckExpr e
   t <- findActualType t
   if isSubtype e' t then return t else throwError $ TypeError "type mismatch"
@@ -339,9 +339,9 @@ typeCheckStmt (Return maybeExp) toReturn comp = do
           if isSubtype t t' then comp else throwError $ TypeError "type mismatch"
         Nothing -> if isSubtype TVoid t' then comp else throwError $ TypeError "type mismatch"
     Nothing -> throwError $ TypeError "cannot return in this context"
-typeCheckStmt (TypeAlias n t) _ comp =
+typeCheckStmt (TypeAlias n (TSTypeWrapper t)) _ comp =
   putUserTypeEnv n t comp
-typeCheckStmt (InterfaceDeclaration n t) _ comp =
+typeCheckStmt (InterfaceDeclaration n (TSTypeWrapper t)) _ comp =
   putUserTypeEnv n t comp
 typeCheckStmt Empty _ comp = comp
 typeCheckStmt _ _ _ = undefined

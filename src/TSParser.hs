@@ -595,7 +595,7 @@ annotatedExpP = do
   e <- baseExpP
   me <- optional (stringP ":" *> typeP)
   case me of
-    Just t -> return (AnnotatedExpression t e)
+    Just t -> return (AnnotatedExpression (TSTypeWrapper t) e)
     Nothing -> return e
 
 -- | Non-Primitive, Greedy
@@ -655,7 +655,7 @@ constAssignmentP = do
   exp <- expP
   let finalExpr = case expType of
         Nothing -> exp
-        Just t -> AnnotatedExpression t exp
+        Just t -> AnnotatedExpression (TSTypeWrapper t) exp
   return (ConstAssignment (Name name) finalExpr)
 
 -- | Non-Primitive, Greedy
@@ -669,7 +669,7 @@ letAssignmentP = do
   exp <- expP
   let finalExpr = case expType of
         Nothing -> exp
-        Just t -> AnnotatedExpression t exp
+        Just t -> AnnotatedExpression (TSTypeWrapper t) exp
   return (LetAssignment (Name name) finalExpr)
 
 -- | Primitive, Greedy
@@ -779,14 +779,14 @@ typeAliasP = do
   stringIsoP "type"
   n <- nameP
   stringP "="
-  TypeAlias n <$> typeP
+  TypeAlias n . TSTypeWrapper <$> typeP
 
 -- | Non-Primitive, Greedy
 interfaceP :: Parser Statement
 interfaceP = do
   stringIsoP "interface"
   n <- nameP
-  InterfaceDeclaration n <$> objectTypeP
+  InterfaceDeclaration n . TSTypeWrapper <$> objectTypeP
 
 -- | Non-Primitive, Greedy
 emptyP :: Parser Statement
