@@ -824,6 +824,9 @@ parseTSExp = parse expP
 parseTSStat :: String -> Either ParserError Statement
 parseTSStat = parse statementP
 
+parseTSSource :: String -> Either ParserError Block
+parseTSSource = parse (const <$> blockP <*> P.eof)
+
 -- | parseFromFile p filePath runs a string parser p on the input
 -- read from filePath using readFile. Returns either a
 -- ParseError (Left) or a value of type a (Right).

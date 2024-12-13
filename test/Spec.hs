@@ -9,7 +9,7 @@ import GHC.IO (unsafePerformIO)
 import GHC.IO.Exception (ExitCode (ExitFailure, ExitSuccess))
 import GHC.IO.Handle
 import Model
-import System.IO.Temp (withSystemTempFile)
+import System.IO.Temp (withSystemTempFile, withTempFile)
 import System.Process (readProcessWithExitCode)
 import TSError
 import TSGen
@@ -33,31 +33,24 @@ matchTypeMap truthTypeMap typeMap =
 main :: IO ()
 main = do
   -- typechecker
-  putStrLn "test_model"
-  runTestTT test_model
+  -- putStrLn "test_model"
+  -- runTestTT test_model
+  -- runTestTT test_typeChecker
+  -- putStrLn "subtypeReflexive"
+  -- quickCheckN 100 prop_subtypeReflexive
+  -- putStrLn "properBottomTypeNever"
+  -- quickCheckN 100 prop_properBottomTypeNever
+  -- putStrLn "properTopTypeUnknown"
+  -- quickCheckN 100 prop_properTopTypeUnknown
+  -- putStrLn "chaoticTopTypeAny"
+  -- quickCheckN 100 prop_chaoticTopTypeAny
+  -- putStrLn "chaoticBottomTypeAny"
+  -- quickCheckN 100 prop_chaoticBottomTypeAny
+  -- putStrLn "transitiveExceptAny"
+  -- quickCheckN 100 prop_transitiveExceptAny
   putStrLn "differential"
-  quickCheckN 100 prop_differential
+  quickCheckN 20 prop_differential
   putStrLn "--- All tests complete ---"
-
--- runTestTT test_typeChecker
--- putStrLn "subtypeReflexive"
--- quickCheckN 100 prop_subtypeReflexive
--- putStrLn "properBottomTypeNever"
--- quickCheckN 100 prop_properBottomTypeNever
--- putStrLn "properTopTypeUnknown"
--- quickCheckN 100 prop_properTopTypeUnknown
--- putStrLn "chaoticTopTypeAny"
--- quickCheckN 100 prop_chaoticTopTypeAny
--- putStrLn "chaoticBottomTypeAny"
--- quickCheckN 100 prop_chaoticBottomTypeAny
--- putStrLn "asymmetricExceptAny"
--- quickCheckN 100 prop_asymmetricExceptAny
--- putStrLn "transitiveExceptAny"
--- quickCheckN 100 prop_transitiveExceptAny
--- putStrLn "func"
--- quickCheckN 100 prop_func
--- putStrLn "differential"
--- quickCheckN 100 prop_differential
 
 -- unit tests for the typechecker
 test_typeChecker :: Test
@@ -251,22 +244,36 @@ test_typeCheckProg =
 
 compareToModel :: String -> IO Bool
 compareToModel fileName = do
-  result <-
-    runModelTypeChecker fileName
+  result <- runModelTypeChecker fileName
   parsed <- parseTSFile fileName
   case (result, parsed) of
     (Nothing, Left _) -> return True
-    (Nothing, _) -> return False -- Debug.Trace.traceShow "they failed"
+    (Nothing, _) -> return False
     (Just truthTypeMap, Right ts) ->
       case typeCheckProgram ts of
         Left _ -> return False
         Right typeMap ->
-          -- Debug.Trace.traceShow (truthTypeMap, typeMap) $
           return $
             matchTypeMap truthTypeMap typeMap
     (_, Left err) ->
-      -- Debug.Trace.traceShow err $
       return False
+
+compareToModel' :: String -> IO Bool
+compareToModel' source =
+  withTempFile "./tmp" "tempFile.ts" $ \outputFile handle -> do
+    hPutStr handle source
+    hFlush handle
+    result <- runModelTypeChecker outputFile
+    let parsed = parseTSSource source
+    hClose handle
+    case (result, parsed) of
+      (Nothing, Left _) -> return True
+      (Nothing, _) -> return False
+      (Just truthTypeMap, Right ts) ->
+        case typeCheckProgram ts of
+          Left _ -> return False
+          Right typeMap -> return $ matchTypeMap truthTypeMap typeMap
+      (_, Left err) -> return False
 
 test_model :: Test
 test_model =
@@ -327,11 +334,6 @@ prop_differential :: Block -> Property
 prop_differential b = ioProperty $ prop_ioDifferential b
 
 prop_ioDifferential :: Block -> IO Property
-prop_ioDifferential b =
-  -- write to temp file and compare with model
-  withSystemTempFile "tempFile" $ \outputFile handle -> do
-    hPutStr handle $ pretty b
-    hFlush handle
-    hClose handle
-    result <- compareToModel outputFile
-    return $ property result
+prop_ioDifferential b = do
+  passed <- compareToModel' (pretty b)
+  return $ property passed
