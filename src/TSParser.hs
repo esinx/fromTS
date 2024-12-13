@@ -273,7 +273,7 @@ numberValP =
       ]
 
 -- >>> parse (many (wsP numberValP)) "1 0 23 -23 1.0 5.0 -5.0 5. .5 0.5 -.5 -0.5 -124. 1e1 1E1 10e1 10.e1 -.10e1 0.1e2 5E-5 2e-2 -1.0e1 -0.e2 0b1 0B1110 -0o4 -0O771 0x1 -0XFaC3 0XC0DE -Infinity Infinity NaN 5"
--- Right [1,0,23,-23,1,5,-5,5,0.5,0.5,-0.5,-0.5,-124,10,10,100,100,-1,10,5.0e-5,2.0e-2,-10,0,1,14,-4,-505,1,-64195,49374,-Infinity,Infinity,NaN,5]
+-- Right [Double 1.0,Double 0.0,Double 23.0,Double (-23.0),Double 1.0,Double 5.0,Double (-5.0),Double 5.0,Double 0.5,Double 0.5,Double (-0.5),Double (-0.5),Double (-124.0),Double 10.0,Double 10.0,Double 100.0,Double 100.0,Double (-1.0),Double 10.0,Double 5.0e-5,Double 2.0e-2,Double (-10.0),Double (-0.0),Double 1.0,Double 14.0,Double (-4.0),Double (-505.0),Double 1.0,Double (-64195.0),Double 49374.0,NInfinity,Infinity,NaN,Double 5.0]
 
 -- | Primitive, Greedy
 boolValP :: Parser Bool
@@ -315,7 +315,7 @@ propertyP = P.try $ do
   return (key, val)
 
 objectValP :: Parser (Map String Expression)
-objectValP = fromList <$> braces (propertyP `P.sepEndBy` (stringP "," <|> (wsP P.newline $> ())))
+objectValP = fromList <$> braces (propertyP `P.sepEndBy` stringP ",")
 
 -- | Primitive, Greedy
 literalP :: Parser Literal
@@ -425,8 +425,9 @@ typePropertyP = P.try $ do
   return (key, finalTp)
 
 -- | Primitive, Greedy
+-- TODO: stop accepting two fields on same line (not trivial)
 objectTypeP :: Parser TSType
-objectTypeP = TUserObject . fromList <$> braces (typePropertyP `P.sepEndBy` (stringP ";" <|> (wsP P.newline $> ())))
+objectTypeP = TUserObject . fromList <$> braces (typePropertyP `P.sepEndBy` optional (stringP ";" <|> stringP ","))
 
 -- | Primitive, Greedy
 baseTypeP :: Parser TSType
@@ -554,7 +555,7 @@ bopP =
 
 -- >>> parse (many bopP) "+ >= .."
 -- Right [PlusBop,Ge]
--- >>> parse (many bopP) "|| >>= +   <= - //  \n== % * <<===> >"
+-- >>> parse (many bopP) "|| >>= +   <= - / /  \n== % * <<===> >"
 -- Right [Or,RightShiftAssign,PlusBop,Le,MinusBop,Div,Div,Eq,Mod,Times,LeftShiftAssign,Eq,Gt,Gt]
 
 -- | Primitive, Greedy
@@ -577,7 +578,7 @@ varP = tryChoice [mkVar <$> prefixP <*> some indexP, Name <$> nameP]
 -- >>> parse (many varP) "x y z"
 -- Right [Name "x",Name "y",Name "z"]
 -- >>> parse varP "(x.y[1]).z"
--- Right (Dot (Var (Element (Var (Dot (Var (Name "x")) "y")) (Lit (NumberLiteral 1)))) "z")
+-- Right (Dot (Var (Element (Var (Dot (Var (Name "x")) "y")) (Lit (NumberLiteral (Double 1.0))))) "z")
 
 -- | Non-Primitive, Greedy
 baseExpP :: Parser Expression
@@ -839,11 +840,35 @@ parseFromFile parser filename = do
 parseTSFile :: String -> IO (Either ParserError Block)
 parseTSFile = parseFromFile (const <$> blockP <*> P.eof)
 
+wVariables :: Block
+wVariables = Block [ConstAssignment (Name "num") (BinaryOp (Lit (NumberLiteral (Double 1.0))) PlusBop (Lit (NumberLiteral (Double 1.0)))),ConstAssignment (Name "str") (BinaryOp (Lit (StringLiteral "literal-string")) PlusBop (Lit (StringLiteral "concatenated"))),ConstAssignment (Name "boolTrue") (BinaryOp (Lit (BooleanLiteral True)) Or (Lit (BooleanLiteral False))),ConstAssignment (Name "boolFalse") (BinaryOp (Lit (BooleanLiteral True)) And (Lit (BooleanLiteral False)))]
+
+wObject :: Block
+wObject = Block [ConstAssignment (Name "obj") (Lit (ObjectLiteral (fromList [("key",Lit (StringLiteral "value")),("nested",Lit (ObjectLiteral (fromList [("key",Lit (StringLiteral "value"))])))])))]
+
+wConstLiterals :: Block
+wConstLiterals = Block [ConstAssignment (Name "num") (Lit (NumberLiteral (Double 42.0))),ConstAssignment (Name "str") (Lit (StringLiteral "literal-string")),ConstAssignment (Name "boolTrue") (Lit (BooleanLiteral True)),ConstAssignment (Name "boolFalse") (Lit (BooleanLiteral False))]
+
+wBfs :: Block
+wBfs = Block [ConstAssignment (Name "graph") (AnnotatedExpression (TSTypeWrapper (TArray (TArray TNumber))) (Array [Array [Lit (NumberLiteral (Double 1.0)),Lit (NumberLiteral (Double 2.0))],Array [Lit (NumberLiteral (Double 3.0)),Lit (NumberLiteral (Double 4.0))],Array [Lit (NumberLiteral (Double 5.0))],Array [],Array [Lit (NumberLiteral (Double 5.0))],Array []])),ConstAssignment (Name "queue") (AnnotatedExpression (TSTypeWrapper (TArray TNumber)) (Array [])),LetAssignment (Name "head") (Lit (NumberLiteral (Double 0.0))),LetAssignment (Name "tail") (Lit (NumberLiteral (Double 0.0))),ConstAssignment (Name "startNode") (Lit (NumberLiteral (Double 0.0))),AnyExpression (BinaryOp (Var (Element (Var (Name "queue")) (Var (Name "tail")))) Assign (Var (Name "startNode"))),AnyExpression (UnaryOpPostfix (Var (Name "tail")) IncPost),ConstAssignment (Name "visited") (AnnotatedExpression (TSTypeWrapper (TArray TBoolean)) (Array [Lit (BooleanLiteral False),Lit (BooleanLiteral False),Lit (BooleanLiteral False),Lit (BooleanLiteral False),Lit (BooleanLiteral False),Lit (BooleanLiteral False)])),AnyExpression (BinaryOp (Var (Element (Var (Name "visited")) (Var (Name "startNode")))) Assign (Lit (BooleanLiteral True))),While (BinaryOp (Var (Name "head")) Neq (Var (Name "tail"))) (Block [ConstAssignment (Name "currentNode") (Var (Element (Var (Name "queue")) (Var (Name "head")))),AnyExpression (UnaryOpPostfix (Var (Name "head")) IncPost),ConstAssignment (Name "neighbors") (Var (Element (Var (Name "graph")) (Var (Name "currentNode")))),For (LetAssignment (Name "i") (Lit (NumberLiteral (Double 0.0)))) (BinaryOp (Var (Name "i")) Lt (Var (Dot (Var (Name "neighbors")) "length"))) (UnaryOpPostfix (Var (Name "i")) IncPost) (Block [ConstAssignment (Name "neighbor") (Var (Element (Var (Name "neighbors")) (Var (Name "i")))),If [(UnaryOpPrefix Not (Var (Element (Var (Name "visited")) (Var (Name "neighbor")))),Block [AnyExpression (BinaryOp (Var (Element (Var (Name "visited")) (Var (Name "neighbor")))) Assign (Lit (BooleanLiteral True))),AnyExpression (BinaryOp (Var (Element (Var (Name "queue")) (Var (Name "tail")))) Assign (Var (Name "neighbor"))),AnyExpression (UnaryOpPostfix (Var (Name "tail")) IncPost)])] (Block [])])])]
+
+wLiteralsSimple :: Block
+wLiteralsSimple = Block [ConstAssignment (Name "num") (Lit (NumberLiteral (Double 42.0))),ConstAssignment (Name "str") (Lit (StringLiteral "literal-string")),ConstAssignment (Name "boolTrue") (AnnotatedExpression (TSTypeWrapper (TBooleanLiteral False)) (Lit (BooleanLiteral True))),ConstAssignment (Name "boolFalse") (AnnotatedExpression (TSTypeWrapper TBoolean) (Lit (BooleanLiteral False))),ConstAssignment (Name "arrOfNum") (Array [Lit (NumberLiteral (Double 1.0)),Lit (NumberLiteral (Double 2.0)),Lit (NumberLiteral (Double 3.0))]),ConstAssignment (Name "arrOfStr") (Array [Lit (StringLiteral "a"),Lit (StringLiteral "b"),Lit (StringLiteral "c")]),ConstAssignment (Name "arrOfBool") (Array [Lit (BooleanLiteral True),Lit (BooleanLiteral False),Lit (BooleanLiteral True)]),ConstAssignment (Name "nullLiteral") (Lit NullLiteral),ConstAssignment (Name "decimal") (AnnotatedExpression (TSTypeWrapper TNumber) (Lit (NumberLiteral (Double 42.0)))),ConstAssignment (Name "decimalFloat") (UnaryOpPrefix MinusUop (Lit (NumberLiteral (Double 42.42)))),ConstAssignment (Name "binary") (Lit (NumberLiteral (Double 42.0))),ConstAssignment (Name "octal") (AnnotatedExpression (TSTypeWrapper TString) (UnaryOpPrefix MinusUop (Lit (NumberLiteral (Double 42.0))))),ConstAssignment (Name "hexadecimal") (Lit (NumberLiteral (Double 42.0))),ConstAssignment (Name "scientific") (BinaryOp (BinaryOp (BinaryOp (BinaryOp (UnaryOpPrefix MinusUop (Lit (NumberLiteral (Double 42.0)))) Times (BinaryOp (Lit (NumberLiteral (Double 100.0))) Exp (Lit (NumberLiteral (Double 2.0))))) LeftShift (Lit (NumberLiteral (Double 4.0)))) Div (Lit (NumberLiteral (Double 4.2)))) BitOr (Lit (NumberLiteral (Double 93.0)))),ConstAssignment (Name "scientificNegative") (Lit (NumberLiteral (Double 0.42000000000000004))),ConstAssignment (Name "infinity") (Lit (NumberLiteral Infinity)),ConstAssignment (Name "negativeInfinity") (UnaryOpPrefix MinusUop (Lit (NumberLiteral Infinity))),ConstAssignment (Name "nan") (Lit (NumberLiteral NaN)),For (LetAssignment (Name "x") (Lit (NumberLiteral (Double 0.0)))) (BinaryOp (Var (Name "x")) Lt (Lit (NumberLiteral (Double 10.0)))) (UnaryOpPostfix (Var (Name "x")) IncPost) (Block [AnyExpression (BinaryOp (Var (Name "i")) Assign (Var (Name "x")))]),If [(Lit (BooleanLiteral True),Block [LetAssignment (Name "val") (Lit (StringLiteral "5 == 6"))]),(BinaryOp (BinaryOp (Lit (NumberLiteral (Double 5.0))) MinusBop (Lit (NumberLiteral (Double 7.0)))) Lt (Lit (NumberLiteral (Double 21.0))),Block [AnyExpression (BinaryOp (Var (Name "val2")) Assign (Lit (BooleanLiteral True)))])] (Block []),Try (Block [AnyExpression (BinaryOp (Lit (NumberLiteral (Double 5.0))) PlusBop (Lit (NumberLiteral (Double 6.0))))]) (Just (AnnotatedExpression (TSTypeWrapper TAny) (Var (Name "a")))) (Block [ConstAssignment (Name "names") (Array [Lit (StringLiteral "a"),Lit (StringLiteral "b"),Lit (StringLiteral "c")])]) (Block [])]
+
+wLiterals :: Block
+wLiterals = Block [ConstAssignment (Name "num") (Lit (NumberLiteral (Double 42.0))),ConstAssignment (Name "str") (Lit (StringLiteral "literal-string")),ConstAssignment (Name "boolTrue") (AnnotatedExpression (TSTypeWrapper (TBooleanLiteral False)) (Lit (BooleanLiteral True))),ConstAssignment (Name "boolFalse") (AnnotatedExpression (TSTypeWrapper TBoolean) (Lit (BooleanLiteral False))),ConstAssignment (Name "constObj") (AnnotatedExpression (TSTypeWrapper (TTuple [TNumber,TBoolean])) (Lit (ObjectLiteral (fromList [("key",Lit (StringLiteral "value"))])))),ConstAssignment (Name "obj") (Lit (ObjectLiteral (fromList [("key",Lit (StringLiteral "value")),("key2",Lit (NumberLiteral (Double 42.0)))]))),ConstAssignment (Name "arrOfNum") (Array [Lit (NumberLiteral (Double 1.0)),Lit (NumberLiteral (Double 2.0)),Lit (NumberLiteral (Double 3.0))]),ConstAssignment (Name "arrOfStr") (Array [Lit (StringLiteral "a"),Lit (StringLiteral "b"),Lit (StringLiteral "c")]),ConstAssignment (Name "arrOfBool") (Array [Lit (BooleanLiteral True),Lit (BooleanLiteral False),Lit (BooleanLiteral True)]),ConstAssignment (Name "arrOfObj") (Array [Lit (ObjectLiteral (fromList [("key",Lit (StringLiteral "value"))])),Lit (ObjectLiteral (fromList [("key",Lit (StringLiteral "value"))]))]),ConstAssignment (Name "arrOfArr") (Array [Array [Lit (NumberLiteral (Double 1.0)),Lit (NumberLiteral (Double 2.0)),Lit (NumberLiteral (Double 3.0))],Array [Lit (StringLiteral "a"),Lit (StringLiteral "b"),Lit (StringLiteral "c")]]),ConstAssignment (Name "arrOfMixed") (Array [Lit (NumberLiteral (Double 1.0)),Lit (StringLiteral "a"),Lit (BooleanLiteral True),Lit (ObjectLiteral (fromList [("key",Lit (StringLiteral "value"))])),Array [Lit (NumberLiteral (Double 1.0)),Lit (NumberLiteral (Double 2.0)),Lit (NumberLiteral (Double 3.0))]]),ConstAssignment (Name "nullLiteral") (Lit NullLiteral),ConstAssignment (Name "decimal") (AnnotatedExpression (TSTypeWrapper TNumber) (Lit (NumberLiteral (Double 42.0)))),ConstAssignment (Name "decimalFloat") (UnaryOpPrefix MinusUop (Lit (NumberLiteral (Double 42.42)))),ConstAssignment (Name "binary") (Lit (NumberLiteral (Double 42.0))),ConstAssignment (Name "octal") (AnnotatedExpression (TSTypeWrapper TString) (UnaryOpPrefix MinusUop (Lit (NumberLiteral (Double 42.0))))),ConstAssignment (Name "hexadecimal") (Lit (NumberLiteral (Double 42.0))),ConstAssignment (Name "scientific") (BinaryOp (BinaryOp (BinaryOp (BinaryOp (UnaryOpPrefix MinusUop (Lit (NumberLiteral (Double 42.0)))) Times (BinaryOp (Lit (NumberLiteral (Double 100.0))) Exp (Lit (NumberLiteral (Double 2.0))))) LeftShift (Lit (NumberLiteral (Double 4.0)))) Div (Lit (NumberLiteral (Double 4.2)))) BitOr (Lit (NumberLiteral (Double 93.0)))),ConstAssignment (Name "scientificNegative") (Lit (NumberLiteral (Double 0.42000000000000004))),ConstAssignment (Name "infinity") (Lit (NumberLiteral Infinity)),ConstAssignment (Name "negativeInfinity") (UnaryOpPrefix MinusUop (Lit (NumberLiteral Infinity))),ConstAssignment (Name "nan") (Lit (NumberLiteral NaN)),TypeAlias "Test1" (TSTypeWrapper (TUserObject (fromList [("test",TIntersection [TTuple [TNumberLiteral 5.0,TNumberLiteral 3.0],TTuple [TStringLiteral "test",TArray (TNumberLiteral 4.0),TString]])]))),InterfaceDeclaration "Test2" (TSTypeWrapper (TUserObject (fromList [("test",TNumberLiteral 5.0)]))),ConstAssignment (Name "test1") (AnnotatedExpression (TSTypeWrapper (TTypeAlias "Test2")) (Lit (ObjectLiteral (fromList [("test",Lit (NumberLiteral (Double 5.0)))])))),For (LetAssignment (Name "x") (Lit (NumberLiteral (Double 0.0)))) (BinaryOp (Var (Name "x")) Lt (Lit (NumberLiteral (Double 10.0)))) (UnaryOpPostfix (Var (Name "x")) IncPost) (Block [AnyExpression (BinaryOp (Var (Name "i")) Assign (Var (Name "x")))]),If [(Lit (BooleanLiteral True),Block [LetAssignment (Name "val") (Lit (StringLiteral "5 == 6"))]),(BinaryOp (BinaryOp (Lit (NumberLiteral (Double 5.0))) MinusBop (Lit (NumberLiteral (Double 7.0)))) Lt (Lit (NumberLiteral (Double 21.0))),Block [AnyExpression (BinaryOp (Var (Name "val2")) Assign (Lit (BooleanLiteral True)))])] (Block []),Try (Block [AnyExpression (BinaryOp (Lit (NumberLiteral (Double 5.0))) PlusBop (Lit (NumberLiteral (Double 6.0))))]) (Just (AnnotatedExpression (TSTypeWrapper TAny) (Var (Name "a")))) (Block [ConstAssignment (Name "names") (Array [Lit (StringLiteral "a"),Lit (StringLiteral "b"),Lit (StringLiteral "c")])]) (Block []),TypeAlias "MyType" (TSTypeWrapper (TUnion [TNumber,TString,TBoolean])),ConstAssignment (Name "test") (AnnotatedExpression (TSTypeWrapper (TTypeAlias "MyType")) (Lit (NumberLiteral (Double 5.0)))),TypeAlias "MyType2" (TSTypeWrapper (TUserObject (fromList [("field1",TNumber),("field2",TUnion [TString,TUndefined]),("field3",TUnion [TBoolean,TTypeAlias "MyType"]),("field4",TArray (TUnion [TNumber,TUnion [TTypeAlias "MyType2",TTypeAlias "MyType"]])),("test field",TNumberLiteral 5.0)]))),InterfaceDeclaration "MyType3" (TSTypeWrapper (TUserObject (fromList [("field1",TNumber),("field2",TString),("field3",TUnion [TUnion [TBoolean,TTypeAlias "MyType"],TUndefined]),("field4",TUnion [TUnion [TNumber,TArray (TUnion [TTypeAlias "MyType2",TTypeAlias "MyType"])],TUndefined])])))]
+
 tParseFiles :: Test
 tParseFiles =
   "parse files"
     ~: TestList
-      [] -- TODO: FILL IN
+      [ "variables.ts" ~: p "test/variables.ts" wVariables,
+        "object.ts" ~: p "test/object.ts" wObject,
+        "const-literals.ts" ~: p "test/const-literals.ts" wConstLiterals,
+        "bfs.ts" ~: p "test/bfs.ts" wBfs,
+        "literals-simple.ts" ~: p "test/literals-simple.ts" wLiteralsSimple,
+        "literals.ts" ~: p "test/literals.ts" wLiterals
+      ]
   where
     p fn ast = do
       result <- parseTSFile fn
@@ -941,7 +966,7 @@ test_all =
     TestList [test_comb, test_literal, test_exp, test_stat, tParseFiles]
 
 -- >>> test_all
--- Counts {cases = 22, tried = 22, errors = 0, failures = 0}
+-- Counts {cases = 28, tried = 28, errors = 0, failures = 0}
 
 -- | Tests parsing the pretty printed value of a literal, should match
 prop_roundtrip_lit :: Literal -> Bool
