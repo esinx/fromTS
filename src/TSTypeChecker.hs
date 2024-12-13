@@ -94,12 +94,8 @@ typeCheckUnaryOpPrefix IncPre (TNumberLiteral n) =
 typeCheckUnaryOpPrefix IncPre t
   | isSubtype t TNumber = return TNumber
   | otherwise = throwError $ TypeError "expected number type"
-typeCheckUnaryOpPrefix PlusUop t
-  | isSubtype t TNumber = return TNumber -- TODO: check behavior, it seems like +"a" is still of number type (no error)
-  | otherwise = throwError $ TypeError "expected number type"
-typeCheckUnaryOpPrefix MinusUop t
-  | isSubtype t TNumber = return TNumber
-  | otherwise = throwError $ TypeError "expected number type"
+typeCheckUnaryOpPrefix PlusUop t = return TNumber
+typeCheckUnaryOpPrefix MinusUop t = return TNumber
 typeCheckUnaryOpPrefix Void _ = return TUndefined
 
 typeCheckUnaryOpPostfix :: UopPostfix -> TSType -> TSTypeChecker TSType

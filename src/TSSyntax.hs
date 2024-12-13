@@ -221,7 +221,12 @@ instance PP TSType where
       ppPrec _ _ TBracket = PP.text "{}"
       ppPrec _ _ TObject = PP.text "object"
       ppPrec _ b (TTypeAlias n) = pp b n
-      ppPrec _ b (TUserObject m) = PP.braces (PP.space <> PP.sep (PP.punctuate PP.comma (map ppa (Map.toList m))) <> PP.space)
+      ppPrec _ b (TUserObject m) =
+        PP.vcat
+          [ PP.char '{',
+            PP.nest 2 $ PP.sep (PP.punctuate PP.comma (map ppa (Map.toList m))) <> PP.space,
+            PP.char '}'
+          ]
         where
           ppa (s, v) = PP.text s <> (PP.colon <+> pp b v)
       ppPrec _ _ TUnknown = PP.text "unknown"
@@ -359,76 +364,63 @@ instance PP Statement where
   pp b (LetAssignment v (AnnotatedExpression name e)) = (PP.text "let" <+> (pp b v <> (PP.colon <+> pp b name <+> PP.equals <+> pp b e))) <> PP.semi
   pp b (LetAssignment v e) = (PP.text "let" <+> pp b v <+> PP.equals <+> pp b e) <> PP.semi
   pp b (If [] elseBlock) =
-    PP.text "if (false) {} else {"
-      PP.$$ PP.nest 2 (pp b elseBlock)
-      PP.$$ PP.char '}'
-  pp t (If ((cond, block) : rest) elseBlock) =
-    ppIfChain (cond, block) rest elseBlock
-    where
-      ppIfChain :: (Expression, Block) -> [(Expression, Block)] -> Block -> Doc
-      ppIfChain (c, b) [] elseBlk =
-        -- No more conditions, just print if and optional else
-        PP.hang (PP.text "if" <+> PP.parens (pp t c) <+> PP.char '{') 2 (pp t b)
-          PP.$$ PP.char '}'
-            <> ( if not (isEmptyBlock t elseBlk)
-                   then
-                     PP.text " else {"
-                       PP.$$ PP.nest 2 (pp t elseBlk)
-                       PP.$$ PP.char '}'
-                   else PP.empty
-               )
-      ppIfChain (c, b) ((c2, b2) : xs) elseBlk =
-        -- Still have more conditions, print `if` then chain `else if`s
-        PP.hang (PP.text "if" <+> PP.parens (pp t c) <+> PP.char '{') 2 (pp t b)
-          PP.$$ PP.char '}'
-            <> PP.text " else"
-            <> PP.hang (PP.text " if" <+> PP.parens (pp t c2) <+> PP.char '{') 2 (pp t b2)
-          PP.$$ PP.char '}'
-            <> ppElseIfChain xs elseBlk
-
-      ppElseIfChain :: [(Expression, Block)] -> Block -> Doc
-      ppElseIfChain [] elseBlk =
-        if not (isEmptyBlock t elseBlk)
-          then
-            PP.text " else {"
-              PP.$$ PP.nest 2 (pp t elseBlk)
-              PP.$$ PP.char '}'
-          else PP.empty
-      ppElseIfChain ((c, b) : xs) elseBlk =
-        PP.text " else"
-          <> PP.hang (PP.text " if" <+> PP.parens (pp t c) <+> PP.char '{') 2 (pp t b)
-          PP.$$ PP.char '}'
-            <> ppElseIfChain xs elseBlk
-  pp t (For init guard update b) =
-    PP.hang (PP.text "for" <+> PP.parens (pp t init <+> (pp t guard <> (PP.semi <+> pp t update))) <+> PP.char '{') 2 (pp t b)
-      PP.$$ PP.char '}'
-  pp b (While guard e) =
-    PP.hang (PP.text "while" <+> PP.parens (pp b guard) <+> PP.char '{') 2 (pp b e)
-      PP.$$ PP.char '}'
+    PP.vcat
+      [ PP.text "if (false) {",
+        PP.text "} else {",
+        PP.nest 2 (pp b elseBlock),
+        PP.char '}'
+      ]
+  pp t (If ((c, b) : rest) elseBlock) =
+    PP.vcat $
+      [ PP.text "if" <+> PP.parens (pp t c) <+> PP.char '{',
+        PP.nest 2 (pp t b)
+      ]
+        ++ concatMap
+          ( \(cond, blk) ->
+              [ PP.text "} else if" <+> PP.parens (pp t cond) <+> PP.char '{',
+                PP.nest 2 (pp t blk)
+              ]
+          )
+          rest
+        ++ ( if not (isEmptyBlock t elseBlock)
+               then [PP.text "} else {", PP.nest 2 (pp t elseBlock)]
+               else []
+           )
+        ++ [PP.char '}']
+  pp t (For init guard update blk) =
+    PP.vcat
+      [ PP.text "for" <+> PP.parens (pp t init <+> (pp t guard <> (PP.semi <+> pp t update))) <+> PP.char '{',
+        PP.nest 2 (pp t blk),
+        PP.char '}'
+      ]
+  pp b (While guard blk) =
+    PP.vcat
+      [ PP.text "while" <+> PP.parens (pp b guard) <+> PP.char '{',
+        PP.nest 2 (pp b blk),
+        PP.char '}'
+      ]
   pp _ Break = PP.text "break" <> PP.semi
   pp _ Continue = PP.text "continue" <> PP.semi
-  pp b (Try b1 mbE b2 b3) =
-    PP.hang (PP.text "try {") 2 (pp b b1)
-      PP.$$ PP.char '}'
-        <> ( case mbE of
+  pp b (Try tryBlock mbE catchBlock finallyBlock) =
+    PP.vcat $
+      [ PP.text "try {",
+        PP.nest 2 (pp b tryBlock)
+      ]
+        ++ ( case mbE of
                Nothing ->
-                 PP.text " catch {"
-                   PP.$$ PP.nest 2 (pp b b2)
-                   PP.$$ PP.char '}'
+                 if not (isEmptyBlock b catchBlock) || isEmptyBlock b finallyBlock
+                   then [PP.text "} catch {", PP.nest 2 (pp b catchBlock)]
+                   else []
                Just e ->
-                 PP.text " catch ("
-                   <> pp b e
-                   <> PP.text ") {"
-                   PP.$$ PP.nest 2 (pp b b2)
-                   PP.$$ PP.char '}'
+                 [ PP.text "} catch" <+> PP.parens (pp b e) <+> PP.char '{',
+                   PP.nest 2 (pp b catchBlock)
+                 ]
            )
-        <> ( if isEmptyBlock b b3
-               then PP.empty
-               else
-                 PP.text " finally {"
-                   PP.$$ PP.nest 2 (pp b b3)
-                   PP.$$ PP.char '}'
+        ++ ( if not (isEmptyBlock b finallyBlock)
+               then [PP.text "} finally {", PP.nest 2 (pp b finallyBlock)]
+               else []
            )
+        ++ [PP.char '}']
   pp _ (Return Nothing) = PP.text "return" <> PP.semi
   pp b (Return (Just e)) = (PP.text "return" <+> pp b e) <> PP.semi
   pp False (TypeAlias _ _) = PP.empty
