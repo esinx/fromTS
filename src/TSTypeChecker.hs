@@ -60,7 +60,7 @@ typeCheckVar (Element arrExp indexExp) = do
     TArray t ->
       if isSubtype index TNumber
         then return t
-        else return TAny -- allowing implicit any
+        else throwError $ TypeError "expected number type for index"
     TTuple ts ->
       case index of
         TNumberLiteral n -> do
@@ -70,8 +70,8 @@ typeCheckVar (Element arrExp indexExp) = do
             (True, Just t) -> return t
             _ -> throwError $ TypeError $ "no element at index >=" ++ show s ++ " in tuple"
         t | isSubtype t TNumber -> return (TUnion ts)
-        _ -> return TAny
-    _ -> return TAny
+        _ -> throwError $ TypeError "expected number type for index"
+    _ -> throwError $ TypeError "expected array/ tuple type to index into"
 
 typeCheckUnaryOpPrefix :: UopPrefix -> TSType -> TSTypeChecker TSType
 typeCheckUnaryOpPrefix Not _ = return TBoolean

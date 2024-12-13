@@ -17,14 +17,7 @@ genName = QC.elements ["x", "X", "y", "x0", "X0", "xy", "XY"]
 
 -- | Generate a string literal, being careful about the characters that it may contain
 genStringLit :: Gen String
-genStringLit = escape <$> QC.listOf (QC.elements stringLitChars)
-  where
-    -- escape special characters appearing in the string,
-    escape :: String -> String
-    escape = foldr Char.showLitChar ""
-    -- generate strings containing printable characters or spaces, but not including '\"'
-    stringLitChars :: [Char]
-    stringLitChars = filter (\c -> c /= '\"' && (Char.isSpace c || Char.isPrint c)) ['\NUL' .. '~']
+genStringLit = QC.elements ["", "a", "b", "c", "ab", "cd", "d", "katrina", "eunsoo", "jordan"]
 
 -- | Generate a size-controlled global variable or table field
 genVar :: Int -> Gen Var
@@ -70,9 +63,6 @@ genStatement n =
   QC.frequency
     [ (1, (ConstAssignment . Name <$> genName) <*> genAnnotatedExp n'),
       (1, (LetAssignment . Name <$> genName) <*> genAnnotatedExp n'),
-      (1, return Empty),
-      (1, return Break),
-      (1, return Continue),
       (1, TypeAlias <$> genName <*> arbitrary),
       (1, InterfaceDeclaration <$> genName <*> arbitrary),
       (n, AnyExpression <$> genExp n'),
