@@ -33,6 +33,7 @@ common common-stanza
     , aeson
     , utf8-string
     , safe
+    , temporary
   default-language:
     GHC2021
   default-extensions:

@@ -7,7 +7,9 @@ import Data.Map as Map
 import Debug.Trace
 import GHC.IO (unsafePerformIO)
 import GHC.IO.Exception (ExitCode (ExitFailure, ExitSuccess))
+import GHC.IO.Handle
 import Model
+import System.IO.Temp (withSystemTempFile)
 import System.Process (readProcessWithExitCode)
 import TSError
 import TSGen
@@ -257,7 +259,8 @@ compareToModel fileName = do
     runModelTypeChecker fileName
   parsed <- parseTSFile fileName
   case (result, parsed) of
-    (Nothing, _) -> return False
+    (Nothing, Left _) -> return True
+    (Nothing, _) -> Debug.Trace.traceShow "they failed" return False
     (Just truthTypeMap, Right ts) ->
       case typeCheckProgram ts of
         Left _ -> return False
@@ -329,13 +332,15 @@ prop_func s1 s2 t1 t2 =
   isSubtype t1 s1 && isSubtype s2 t2 ==>
     isSubtype (TFunction [s1] s2) (TFunction [t1] t2)
 
-prop_differential :: Filename -> Block -> Property
-prop_differential filename = ioProperty . prop_ioDifferential filename
+prop_differential :: Block -> Property
+prop_differential b = ioProperty $ prop_ioDifferential b
 
-prop_ioDifferential :: Filename -> Block -> IO Property
-prop_ioDifferential (Filename fn) b =
-  let outputFile = "test/temp/" ++ fn ++ ".ts"
-   in do
-        writeFile outputFile $ pretty b
-        result <- compareToModel outputFile
-        return $ property result
+prop_ioDifferential :: Block -> IO Property
+prop_ioDifferential b =
+  -- write to temp file and compare with model
+  withSystemTempFile "tempFile" $ \outputFile handle -> do
+    hPutStr handle $ pretty b
+    hFlush handle
+    hClose handle
+    result <- compareToModel outputFile
+    return $ property result
