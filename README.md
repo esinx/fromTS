@@ -45,6 +45,7 @@ stack run <file.ts>
 
 To run tests, use:
 ```bash
+cd model; yarn install; yarn build; cd ..
 stack test
 ```
 
