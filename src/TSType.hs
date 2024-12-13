@@ -59,6 +59,7 @@ data TSType
 simplify :: TSType -> TSType
 -- {} | null | undefined = unknown
 simplify (TUnion ts) | List.sort ts == List.sort [TBracket, TNull, TUndefined] = TUnknown
+simplify (TUnion ts) | List.sort ts == List.sort [TBooleanLiteral True, TBooleanLiteral False] = TBoolean
 simplify (TIntersection ts) | TNever `elem` ts = TNever
 simplify (TUnion ts) = simplifyUnions (TUnion ts) False
   where
@@ -106,6 +107,7 @@ isSubtype t1 t2 = isSubtype' (simplify t1) (simplify t2)
 isSubtype' :: TSType -> TSType -> Bool
 -- reflexivity
 isSubtype' t1 t2 | t1 == t2 = True
+isSubtype' (TNumberLiteral d) (TNumberLiteral e) = abs (d - e) < 1e-9
 -- union
 isSubtype' (TUnion ts) t = all (`isSubtype'` t) ts
 isSubtype' t (TUnion ts) = any (isSubtype' t) ts

@@ -15,7 +15,7 @@ data Number
 
 instance Eq Number where
   (==) :: Number -> Number -> Bool
-  (==) (Double d) (Double e) = abs (d - e) < 1e-8
+  (==) (Double d) (Double e) = abs (d - e) < 1e-9
   (==) Infinity Infinity = True
   (==) NInfinity NInfinity = True
   (==) NaN NaN = True

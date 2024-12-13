@@ -16,6 +16,7 @@ newtype TSTypeWrapper = TSTypeWrapper TSType
   deriving (Show)
 
 instance Eq TSTypeWrapper where
+  (==) :: TSTypeWrapper -> TSTypeWrapper -> Bool
   TSTypeWrapper t1 == TSTypeWrapper t2 = t1 =.= t2
 
 newtype Block = Block [Statement]
