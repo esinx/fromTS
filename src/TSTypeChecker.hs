@@ -39,7 +39,9 @@ typeCheckLiteral NullLiteral = return TNull
 typeCheckLiteral UndefinedLiteral = return TUndefined
 
 typeCheckVar :: Var -> TSTypeChecker TSType
-typeCheckVar (Name n) = lookupVarType n
+typeCheckVar (Name n) = do
+  t <- lookupVarType n
+  findActualType t
 typeCheckVar (Dot exp n) = do
   t <- typeCheckExpr' False exp
   case t of
@@ -257,8 +259,8 @@ typeCheckExpr' getLiteralType (Lit l) =
 typeCheckExpr' _ (Var v) = typeCheckVar v
 typeCheckExpr' _ (AnnotatedExpression (TSTypeWrapper t) e) = do
   e' <- typeCheckExpr e
-  t <- findActualType t
-  if isSubtype e' t then return t else throwError $ TypeError "type mismatch"
+  t' <- findActualType t
+  if isSubtype e' t' then return t else throwError $ TypeError "type mismatch"
 typeCheckExpr' True (UnaryOpPrefix MinusUop (Lit (NumberLiteral (Double d)))) = return $ TNumberLiteral (-(d :: Double))
 typeCheckExpr' getLiteralType (UnaryOpPrefix op e) = do
   t <- typeCheckExpr e
