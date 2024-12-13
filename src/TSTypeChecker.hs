@@ -359,7 +359,7 @@ typeCheckStmt (TypeAlias n (TSTypeWrapper t)) _ comp =
 typeCheckStmt (InterfaceDeclaration n (TSTypeWrapper t)) _ comp =
   putUserTypeEnv n t comp
 typeCheckStmt Empty _ comp = comp
-typeCheckStmt _ _ _ = undefined
+typeCheckStmt _ _ _ = throwError $ TypeError "cannot typecheck statement"
 
 -- | typechecks a block
 typeCheckBlock :: Block -> Maybe TSType -> TSTypeChecker TSTypeEnv
