@@ -47,6 +47,10 @@ typeCheckVar (Dot exp n) = do
       case Map.lookup n m of
         Just t -> return t
         Nothing -> throwError $ TypeError $ "field " ++ n ++ " not found in object"
+    TArray t ->
+      if n == "length"
+        then return TNumber
+        else throwError $ TypeError $ "field " ++ n ++ " not found in array"
     TObject -> throwError $ TypeError $ "field " ++ n ++ " not found in object"
     _ -> throwError $ TypeError "expected object type"
 typeCheckVar (Element arrExp indexExp) = do
