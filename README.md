@@ -4,9 +4,9 @@
 
 ## Team
 
-- Eunsoo Shin (esinx)
-- Jordan Hawkman (jhawkman)
-- Katrina Liu (katltn)
+- [Eunsoo Shin](https://github.com/esinx) (esinx)
+- [Jordan Hochman](https://github.com/JHawk0224) (jhawkman)
+- [Katrina Liu](https://github.com/liukatkat) (katltn)
 
 ## Structure
 
