@@ -19,6 +19,27 @@ genName = QC.elements ["x", "X", "y", "x0", "X0", "xy", "XY"]
 genStringLit :: Gen String
 genStringLit = QC.elements ["", "a", "b", "c", "ab", "cd", "d", "katrina", "eunsoo", "jordan"]
 
+genLiteral :: Int -> Gen Literal
+genLiteral 0 =
+  QC.oneof
+    [ NumberLiteral <$> arbitrary,
+      BooleanLiteral <$> arbitrary,
+      pure NullLiteral,
+      pure UndefinedLiteral,
+      StringLiteral <$> genStringLit
+    ]
+genLiteral n =
+  QC.frequency
+    [ (n, NumberLiteral <$> arbitrary),
+      (n, BooleanLiteral <$> arbitrary),
+      (1, pure NullLiteral),
+      (1, pure UndefinedLiteral),
+      (n, StringLiteral <$> genStringLit),
+      (n, ObjectLiteral . Map.fromList <$> QC.vectorOf 3 ((,) <$> genStringLit <*> genExp n'))
+    ]
+  where
+    n' = n `div` 2
+
 -- | Generate a size-controlled global variable or table field
 genVar :: Int -> Gen Var
 genVar 0 = Name <$> genName
@@ -178,15 +199,7 @@ shrinkMapExpr m = [Map.fromList [(s, e') | e' <- shrink e] | (s, e) <- Map.toLis
 
 instance Arbitrary Literal where
   arbitrary :: Gen Literal
-  arbitrary =
-    QC.oneof
-      [ NumberLiteral <$> arbitrary,
-        BooleanLiteral <$> arbitrary,
-        pure NullLiteral,
-        pure UndefinedLiteral,
-        StringLiteral <$> genStringLit,
-        ObjectLiteral . Map.fromList <$> QC.vectorOf 3 ((,) <$> genName <*> arbitrary)
-      ]
+  arbitrary = QC.sized genLiteral
 
   shrink :: Literal -> [Literal]
   shrink (NumberLiteral n) = NumberLiteral <$> shrink n
