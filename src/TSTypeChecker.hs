@@ -348,9 +348,9 @@ typeCheckStmt (Return Nothing) toReturn comp = do
     Nothing -> comp
 -- TODO: functions
 typeCheckStmt (TypeAlias n t) _ comp =
-  updateUserTypeEnv n t comp
+  putUserTypeEnv n t comp
 typeCheckStmt (InterfaceDeclaration n t) _ comp =
-  updateUserTypeEnv n t comp
+  putUserTypeEnv n t comp
 typeCheckStmt Empty _ comp = comp
 typeCheckStmt _ _ _ = undefined
 
