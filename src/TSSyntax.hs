@@ -202,7 +202,7 @@ instance PP TSType where
   pp _ TBracket = PP.text "{}"
   pp _ TObject = PP.text "object"
   pp b (TTypeAlias n) = pp b n
-  pp b (TUserObject m) = PP.braces (PP.sep (PP.punctuate PP.comma (map ppa (Map.toList m))))
+  pp b (TUserObject m) = PP.braces (PP.space <> PP.sep (PP.punctuate PP.comma (map ppa (Map.toList m))) <> PP.space)
     where
       ppa (s, v) = PP.text s <> (PP.colon <+> pp b v)
   pp _ TUnknown = PP.text "unknown"
@@ -211,8 +211,8 @@ instance PP TSType where
   pp _ TVoid = PP.text "void"
   pp _ TNull = PP.text "null"
   pp _ TUndefined = PP.text "undefined"
-  pp b (TUnion ts) = PP.sep (PP.punctuate (PP.text " | ") (map (pp b) ts))
-  pp b (TIntersection ts) = PP.sep (PP.punctuate (PP.text " & ") (map (pp b) ts))
+  pp b (TUnion ts) = PP.sep (PP.punctuate (PP.text " |") (map (pp b) ts))
+  pp b (TIntersection ts) = PP.sep (PP.punctuate (PP.text " &") (map (pp b) ts))
 
 isBase :: Expression -> Bool
 isBase Var {} = True
@@ -349,7 +349,7 @@ instance PP Statement where
         PP.hang (PP.text "if" <+> PP.parens (pp t c) <+> PP.char '{') 2 (pp t b)
           PP.$$ PP.char '}'
             <> PP.text " else"
-            <> PP.hang (PP.text "if" <+> PP.parens (pp t c2) <+> PP.char '{') 2 (pp t b2)
+            <> PP.hang (PP.text " if" <+> PP.parens (pp t c2) <+> PP.char '{') 2 (pp t b2)
           PP.$$ PP.char '}'
             <> ppElseIfChain xs elseBlk
 
@@ -363,7 +363,7 @@ instance PP Statement where
           else PP.empty
       ppElseIfChain ((c, b) : xs) elseBlk =
         PP.text " else"
-          <> PP.hang (PP.text "if" <+> PP.parens (pp t c) <+> PP.char '{') 2 (pp t b)
+          <> PP.hang (PP.text " if" <+> PP.parens (pp t c) <+> PP.char '{') 2 (pp t b)
           PP.$$ PP.char '}'
             <> ppElseIfChain xs elseBlk
   pp t (For init guard update b) =
@@ -398,7 +398,7 @@ instance PP Statement where
   pp False (TypeAlias _ _) = PP.empty
   pp b (TypeAlias n t) = (PP.text "type" <+> pp b n <+> PP.equals <+> pp b t) <> PP.semi
   pp False (InterfaceDeclaration _ _) = PP.empty
-  pp b (InterfaceDeclaration n t) = (PP.text "interface" <+> pp b n <+> PP.equals <+> pp b t) <> PP.semi
+  pp b (InterfaceDeclaration n t) = (PP.text "interface" <+> pp b n <+> pp b t) <> PP.semi
   pp _ Empty = PP.empty
 
 level :: Bop -> Int
