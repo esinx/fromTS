@@ -13,6 +13,7 @@ import System.IO.Temp (withSystemTempFile, withTempFile)
 import System.Process (readProcessWithExitCode)
 import TSError
 import TSGen
+import TSNumber
 import TSParser
 import TSSyntax
 import TSType
@@ -246,7 +247,16 @@ test_typeCheckProg =
                   (AnnotatedExpression TString (Var (Name "x")))
               ]
           )
-          ~?= Left (TypeError "type mismatch")
+          ~?= Left (TypeError "type mismatch"),
+        -- let x = -1;
+        typeCheckProgram
+          ( Block
+              [ ConstAssignment
+                  (Name "x")
+                  (UnaryOpPrefix MinusUop (Lit (NumberLiteral (Double 1))))
+              ]
+          )
+          ~?= Right (Map.fromList [("x", TNumberLiteral (-1))])
       ]
 
 compareToModel :: String -> IO Bool

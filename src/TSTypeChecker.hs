@@ -73,27 +73,26 @@ typeCheckVar (Element arrExp indexExp) = do
         _ -> throwError $ TypeError "expected number type for index"
     _ -> throwError $ TypeError "expected array/ tuple type to index into"
 
-typeCheckUnaryOpPrefix :: Bool -> UopPrefix -> TSType -> TSTypeChecker TSType
-typeCheckUnaryOpPrefix _ Not _ = return TBoolean
-typeCheckUnaryOpPrefix _ BitNeg t
+typeCheckUnaryOpPrefix :: UopPrefix -> TSType -> TSTypeChecker TSType
+typeCheckUnaryOpPrefix Not _ = return TBoolean
+typeCheckUnaryOpPrefix BitNeg t
   | isSubtype t TNumber = return TNumber
   | otherwise = throwError $ TypeError "expected number type"
-typeCheckUnaryOpPrefix _ TypeOf _ = return TString
-typeCheckUnaryOpPrefix _ Spread t = return $ TArray t
-typeCheckUnaryOpPrefix _ DecPre t
+typeCheckUnaryOpPrefix TypeOf _ = return TString
+typeCheckUnaryOpPrefix Spread t = return $ TArray t
+typeCheckUnaryOpPrefix DecPre t
   | isSubtype t TNumber = return TNumber
   | otherwise = throwError $ TypeError "expected number type"
-typeCheckUnaryOpPrefix _ IncPre t
+typeCheckUnaryOpPrefix IncPre t
   | isSubtype t TNumber = return TNumber
   | otherwise = throwError $ TypeError "expected number type"
-typeCheckUnaryOpPrefix _ PlusUop t
+typeCheckUnaryOpPrefix PlusUop t
   | isSubtype t TNumber = return TNumber -- TODO: check behavior, it seems like +"a" is still of number type (no error)
   | otherwise = throwError $ TypeError "expected number type"
-typeCheckUnaryOpPrefix True MinusUop (TNumberLiteral n) = return $ TNumberLiteral (-n)
-typeCheckUnaryOpPrefix _ MinusUop t
+typeCheckUnaryOpPrefix MinusUop t
   | isSubtype t TNumber = return TNumber
   | otherwise = throwError $ TypeError "expected number type"
-typeCheckUnaryOpPrefix _ Void _ = return TUndefined
+typeCheckUnaryOpPrefix Void _ = return TUndefined
 
 typeCheckUnaryOpPostfix :: UopPostfix -> TSType -> TSTypeChecker TSType
 typeCheckUnaryOpPostfix DecPost t
@@ -260,9 +259,10 @@ typeCheckExpr' _ (AnnotatedExpression t e) = do
   e' <- typeCheckExpr e
   t <- findActualType t
   if isSubtype e' t then return t else throwError $ TypeError "type mismatch"
+typeCheckExpr' True (UnaryOpPrefix MinusUop (Lit (NumberLiteral (Double d)))) = return $ TNumberLiteral (-(d :: Double))
 typeCheckExpr' getLiteralType (UnaryOpPrefix op e) = do
   t <- typeCheckExpr e
-  typeCheckUnaryOpPrefix getLiteralType op t
+  typeCheckUnaryOpPrefix op t
 typeCheckExpr' _ (UnaryOpPostfix e op) = do
   t <- typeCheckExpr e
   typeCheckUnaryOpPostfix op t
