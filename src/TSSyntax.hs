@@ -187,7 +187,7 @@ instance PP TSType where
   pp TNumber = PP.text "number"
   pp (TNumberLiteral n) = pp n
   pp TString = PP.text "string"
-  pp (TStringLiteral s) = pp s
+  pp (TStringLiteral s) = pp $ "\"" ++ s ++ "\""
   pp (TArray t) = pp t <> PP.text "[]"
   pp (TTuple ts) = PP.brackets (PP.hcat (PP.punctuate PP.comma (map pp ts)))
   pp TBracket = PP.text "{}"
