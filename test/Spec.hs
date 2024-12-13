@@ -313,9 +313,9 @@ test_model =
     ~: TestList
     $ fmap
       (\fileName -> fileName ~: p fileName)
-      [ -- "./test/const-literals.ts",
-        -- "./test/variables.ts"
-        -- "./test/object.ts",
+      [ "./test/const-literals.ts",
+        "./test/variables.ts",
+        "./test/object.ts",
         "./test/bfs.ts"
       ]
   where
