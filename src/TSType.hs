@@ -9,6 +9,7 @@ import Data.Char qualified as Char
 import Data.List qualified as List
 import Data.Map (Map)
 import Data.Map qualified as Map
+import GHC.IO (unsafePerformIO)
 import TSError
 import Test.QuickCheck (Arbitrary (..), Gen)
 import Test.QuickCheck qualified as QC
@@ -105,13 +106,16 @@ isSubtype t1 t2 = isSubtype' (simplify t1) (simplify t2)
 
 -- | checks if a type is a subtype of another type
 isSubtype' :: TSType -> TSType -> Bool
+isSubtype' (TNumberLiteral n1) (TNumberLiteral n2) = abs (n1 - n2) < 0.001
 -- reflexivity
 isSubtype' t1 t2 | t1 == t2 = True
 isSubtype' (TNumberLiteral d) (TNumberLiteral e) = abs (d - e) < 1e-9
 -- union
+isSubtype' (TUnion ts1) (TUnion ts2) = all (\t1 -> any (isSubtype' t1) ts2) ts1 && all (\t2 -> any (isSubtype' t2) ts1) ts2
 isSubtype' (TUnion ts) t = all (`isSubtype'` t) ts
 isSubtype' t (TUnion ts) = any (isSubtype' t) ts
 -- intersection
+isSubtype' (TIntersection ts1) (TIntersection ts2) = all (\t1 -> any (isSubtype' t1) ts2) ts1 && all (\t2 -> any (isSubtype' t2) ts1) ts2
 isSubtype' (TIntersection ts) t = any (`isSubtype'` t) ts
 isSubtype' t (TIntersection ts) = all (isSubtype' t) ts
 -- proper bottom type
