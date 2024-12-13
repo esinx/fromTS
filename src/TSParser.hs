@@ -814,7 +814,7 @@ statementP =
 
 -- | Non-Primitive, Greedy
 blockP :: Parser Block
-blockP = Block <$> many statementP
+blockP = Block <$> (spaceConsumer *> many statementP)
 
 --------------------------------------------------------------------------------
 
