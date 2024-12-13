@@ -330,8 +330,11 @@ typeCheckStmt (Try tryBlock (Just (Var (Name n))) catchBlock finallyBlock) toRet
   _ <- putVarEnv n TAny (createNewUserTypeEnv $ createNewVarEnv $ typeCheckBlock catchBlock toReturn)
   _ <- typeCheckBlock finallyBlock toReturn
   comp
-typeCheckStmt (Try tryBlock _ catchBlock _) toReturn comp =
-  throwError $ TypeError "expected identifier in catch block"
+typeCheckStmt (Try tryBlock Nothing catchBlock finallyBlock) toReturn comp = do
+  _ <- typeCheckBlock tryBlock toReturn
+  _ <- typeCheckBlock catchBlock toReturn
+  _ <- typeCheckBlock finallyBlock toReturn
+  comp
 typeCheckStmt (Return maybeExp) toReturn comp = do
   case toReturn of
     Just t' -> do
