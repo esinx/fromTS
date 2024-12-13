@@ -42,7 +42,6 @@ data TSType
   | TObject -- object
   | TTypeAlias Name -- type alias
   | TUserObject (Map String TSType)
-  | TFunction [TSType] TSType
   | TUnknown -- proper top
   | TAny -- chaotic top/ bottom type
   | TNever -- bottom type
@@ -88,7 +87,6 @@ isTruthy (TTuple _) = return True
 isTruthy TBracket = return True
 isTruthy TObject = return True
 isTruthy (TUserObject _) = return True
-isTruthy (TFunction _ _) = return True
 isTruthy (TUnion ts) =
   let ts' = map isTruthy ts
    in if Nothing `elem` ts'
@@ -133,15 +131,6 @@ isSubtype' _ TVoid = False
 isSubtype' _ (TStringLiteral _) = False
 isSubtype' _ (TNumberLiteral _) = False
 isSubtype' _ (TBooleanLiteral _) = False
--- T1 <: S1       S2 <: T2
--- ----------------------
---    S1 → S2 <: T1 → T2
-isSubtype' (TFunction args1 ret1) (TFunction args2 ret2) =
-  length args1 <= length args2 -- contravariant
-    && all (uncurry isSubtype') (zip args2 args1)
-    && isSubtype' ret1 ret2
--- nothing is a subtype of functions except bottom types
-isSubtype' _ (TFunction _ _) = False
 -- S1 <: T1       S2 <: T2
 -- ------------------------
 --    S1 * S2 <: T1 * T2
@@ -171,7 +160,6 @@ isSubtype' (TUserObject n) (TUserObject m) =
 -- nothing is a subtype of user objects except bottom types
 isSubtype' _ (TUserObject _) = False
 -- bottom types, function, tuple, array, user objects are subtypes of object
-isSubtype' (TFunction _ _) TObject = True
 isSubtype' (TTuple _) TObject = True
 isSubtype' (TArray _) TObject = True
 isSubtype' (TUserObject _) TObject = True
@@ -235,7 +223,6 @@ genMapType n =
     [ (n, TArray <$> genMapType n'),
       (n, TTuple <$> QC.vectorOf 3 (genMapType n')),
       (n, TUserObject <$> genMap n'),
-      (n, TFunction <$> QC.vectorOf 2 (genMapType n') <*> genMapType n'),
       (n, TUnion <$> QC.vectorOf 3 (genMapType n')),
       (n, TIntersection <$> QC.vectorOf 3 (genMapType n'))
     ]
@@ -254,7 +241,6 @@ genType n =
       (n, TArray <$> genType n'),
       (n, TTuple <$> QC.vectorOf 3 (genType n')),
       (n, TUserObject <$> genMap n'),
-      (n, TFunction <$> QC.vectorOf 2 (genType n') <*> genType n'),
       (n, TUnion <$> QC.vectorOf 3 (genType n')),
       (n, TIntersection <$> QC.vectorOf 3 (genType n'))
     ]
@@ -273,7 +259,6 @@ genTypeExceptNever n =
       (n, TArray <$> genTypeExceptNever n'),
       (n, TTuple <$> QC.vectorOf 3 (genTypeExceptNever n')),
       (n, TUserObject <$> genMap n'),
-      (n, TFunction <$> QC.vectorOf 2 (genTypeExceptNever n') <*> genTypeExceptNever n'),
       (n, TUnion <$> QC.vectorOf 3 (genTypeExceptNever n')),
       (n, TIntersection <$> QC.vectorOf 3 (genTypeExceptNever n'))
     ]
@@ -292,7 +277,6 @@ genTypeExceptAny n =
       (n, TArray <$> genTypeExceptAny n'),
       (n, TTuple <$> QC.vectorOf 3 (genTypeExceptAny n')),
       (n, TUserObject <$> genMap n'),
-      (n, TFunction <$> QC.vectorOf 2 (genTypeExceptAny n') <*> genTypeExceptAny n'),
       (n, TUnion <$> QC.vectorOf 3 (genTypeExceptAny n')),
       (n, TIntersection <$> QC.vectorOf 3 (genTypeExceptAny n'))
     ]
@@ -307,7 +291,6 @@ instance Arbitrary TSType where
   shrink (TArray t) = TArray <$> shrink t
   shrink (TTuple ts) = TTuple <$> shrink ts
   shrink (TUserObject m) = TUserObject <$> shrink m
-  shrink (TFunction ts t) = TFunction <$> shrink ts <*> shrink t
   shrink (TUnion ts) = TUnion <$> shrink ts
   shrink (TIntersection ts) = TIntersection <$> shrink ts
   shrink _ = []

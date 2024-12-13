@@ -199,7 +199,6 @@ instance PP TSType where
   pp (TUserObject m) = PP.braces (PP.sep (PP.punctuate commaSpace (map ppa (Map.toList m))))
     where
       ppa (s, v) = PP.text s <> (PP.colon <+> pp v)
-  pp (TFunction ts t) = undefined
   pp TUnknown = PP.text "unknown"
   pp TAny = PP.text "any"
   pp TNever = PP.text "never"

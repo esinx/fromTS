@@ -115,10 +115,6 @@ test_subtyping =
         isSubtype TObject TBracket ~?= True,
         isSubtype (TUserObject (Map.fromList [("x", TNumber)])) TObject
           ~?= True,
-        isSubtype (TFunction [] TNumber) TObject
-          ~?= True,
-        isSubtype (TFunction [TAny] TNever) (TFunction [TNull] TUnknown)
-          ~?= True,
         isSubtype TAny (TIntersection [TIntersection [TNever]])
           ~?= False,
         isSubtype (TUnion [TBracket, TNull, TUndefined]) TUnknown
@@ -260,17 +256,17 @@ compareToModel fileName = do
   parsed <- parseTSFile fileName
   case (result, parsed) of
     (Nothing, Left _) -> return True
-    (Nothing, _) -> Debug.Trace.traceShow "they failed" return False
+    (Nothing, _) -> return False -- Debug.Trace.traceShow "they failed"
     (Just truthTypeMap, Right ts) ->
       case typeCheckProgram ts of
         Left _ -> return False
         Right typeMap ->
-          Debug.Trace.traceShow (truthTypeMap, typeMap) $
-            return $
-              matchTypeMap truthTypeMap typeMap
+          -- Debug.Trace.traceShow (truthTypeMap, typeMap) $
+          return $
+            matchTypeMap truthTypeMap typeMap
     (_, Left err) ->
-      Debug.Trace.traceShow err $
-        return False
+      -- Debug.Trace.traceShow err $
+      return False
 
 test_model :: Test
 test_model =
@@ -326,11 +322,6 @@ prop_transitiveExceptAny =
   where
     prop_transitiveExceptAny' t1 t2 t3 =
       isSubtype t1 t2 && isSubtype t2 t3 ==> isSubtype t1 t3
-
-prop_func :: TSType -> TSType -> TSType -> TSType -> Property
-prop_func s1 s2 t1 t2 =
-  isSubtype t1 s1 && isSubtype s2 t2 ==>
-    isSubtype (TFunction [s1] s2) (TFunction [t1] t2)
 
 prop_differential :: Block -> Property
 prop_differential b = ioProperty $ prop_ioDifferential b
