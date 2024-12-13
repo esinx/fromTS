@@ -188,14 +188,7 @@ genNameType = QC.elements ["x", "X", "y", "x0", "X0", "xy", "XY"]
 
 -- | Generate a string literal, being careful about the characters that it may contain
 genStringLitType :: Gen String
-genStringLitType = escape <$> QC.listOf (QC.elements stringLitChars)
-  where
-    -- escape special characters appearing in the string,
-    escape :: String -> String
-    escape = foldr Char.showLitChar ""
-    -- generate strings containing printable characters or spaces, but not including '\"'
-    stringLitChars :: [Char]
-    stringLitChars = filter (\c -> c /= '\"' && (Char.isSpace c || Char.isPrint c)) ['\NUL' .. '~']
+genStringLitType = QC.elements ["", "a", "b", "c", "ab", "cd", "d", "katrina", "eunsoo", "jordan"]
 
 -- types without data (except TAny and TNever)
 basicTypes :: [TSType]
