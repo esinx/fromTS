@@ -168,7 +168,13 @@ instance PP Double where
 
 instance PP Number where
   pp :: Bool -> Number -> Doc
-  pp _ = PP.text . show
+  pp _ (Double d) =
+    if d == fromInteger (round d)
+      then PP.text $ show (round d)
+      else PP.text $ show d
+  pp _ Infinity = PP.text "Infinity"
+  pp _ NInfinity = PP.text "-Infinity"
+  pp _ NaN = PP.text "NaN"
 
 instance PP Var where
   pp :: Bool -> Var -> Doc
@@ -289,8 +295,8 @@ instance PP Expression where
   pp :: Bool -> Expression -> Doc
   pp b (Var v) = pp b v
   pp b (Lit l) = pp b l
-  pp False (AnnotatedExpression e _) = pp False e
-  pp b (AnnotatedExpression e t) = pp b e <> (PP.colon <+> pp b t)
+  pp False (AnnotatedExpression _ e) = pp False e
+  pp b (AnnotatedExpression t e) = pp b e <> (PP.colon <+> pp b t)
   pp b (UnaryOpPrefix uop e) =
     if hasSpace uop
       then pp b uop <+> if isBase e then pp b e else PP.parens (pp b e)
@@ -378,7 +384,10 @@ instance PP Statement where
     PP.hang (PP.text "try {") 2 (pp b b1)
       PP.$$ PP.char '}'
         <> ( case mbE of
-               Nothing -> PP.empty
+               Nothing ->
+                 PP.text " catch {"
+                   PP.$$ PP.nest 2 (pp b b2)
+                   PP.$$ PP.char '}'
                Just e ->
                  PP.text " catch ("
                    <> pp b e

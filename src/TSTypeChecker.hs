@@ -73,26 +73,27 @@ typeCheckVar (Element arrExp indexExp) = do
         _ -> throwError $ TypeError "expected number type for index"
     _ -> throwError $ TypeError "expected array/ tuple type to index into"
 
-typeCheckUnaryOpPrefix :: UopPrefix -> TSType -> TSTypeChecker TSType
-typeCheckUnaryOpPrefix Not _ = return TBoolean
-typeCheckUnaryOpPrefix BitNeg t
+typeCheckUnaryOpPrefix :: Bool -> UopPrefix -> TSType -> TSTypeChecker TSType
+typeCheckUnaryOpPrefix _ Not _ = return TBoolean
+typeCheckUnaryOpPrefix _ BitNeg t
   | isSubtype t TNumber = return TNumber
   | otherwise = throwError $ TypeError "expected number type"
-typeCheckUnaryOpPrefix TypeOf _ = return TString
-typeCheckUnaryOpPrefix Spread t = return $ TArray t
-typeCheckUnaryOpPrefix DecPre t
+typeCheckUnaryOpPrefix _ TypeOf _ = return TString
+typeCheckUnaryOpPrefix _ Spread t = return $ TArray t
+typeCheckUnaryOpPrefix _ DecPre t
   | isSubtype t TNumber = return TNumber
   | otherwise = throwError $ TypeError "expected number type"
-typeCheckUnaryOpPrefix IncPre t
+typeCheckUnaryOpPrefix _ IncPre t
   | isSubtype t TNumber = return TNumber
   | otherwise = throwError $ TypeError "expected number type"
-typeCheckUnaryOpPrefix PlusUop t
+typeCheckUnaryOpPrefix _ PlusUop t
   | isSubtype t TNumber = return TNumber -- TODO: check behavior, it seems like +"a" is still of number type (no error)
   | otherwise = throwError $ TypeError "expected number type"
-typeCheckUnaryOpPrefix MinusUop t
+typeCheckUnaryOpPrefix True MinusUop (TNumberLiteral n) = return $ TNumberLiteral (-n)
+typeCheckUnaryOpPrefix _ MinusUop t
   | isSubtype t TNumber = return TNumber
   | otherwise = throwError $ TypeError "expected number type"
-typeCheckUnaryOpPrefix Void _ = return TUndefined
+typeCheckUnaryOpPrefix _ Void _ = return TUndefined
 
 typeCheckUnaryOpPostfix :: UopPostfix -> TSType -> TSTypeChecker TSType
 typeCheckUnaryOpPostfix DecPost t
@@ -120,14 +121,6 @@ typeCheckBinaryOp e1 op e2
   | op `elem` [EqStrict, NeqStrict] = do
       t1 <- typeCheckExpr e1
       t2 <- typeCheckExpr e2
-      -- TODO: there are some cases (e.g. 1 == {}) where 1 is technically a subtype
-      -- of {}, but we should throw error in this case. however, it seems like
-      -- we are not going to parse {} as type {}/ Object but instead as object literal.
-      -- there are also cases like:
-      --          const x = 1;
-      --          const y = {};
-      --          x == y; // does not error
-      -- where if we parse {} as object literal instead of type {}, then it will error...
       if t1 =.= t2
         then return TBoolean
         else throwError $ TypeError "type mismatch"
@@ -267,9 +260,9 @@ typeCheckExpr' _ (AnnotatedExpression t e) = do
   e' <- typeCheckExpr e
   t <- findActualType t
   if isSubtype e' t then return t else throwError $ TypeError "type mismatch"
-typeCheckExpr' _ (UnaryOpPrefix op e) = do
+typeCheckExpr' getLiteralType (UnaryOpPrefix op e) = do
   t <- typeCheckExpr e
-  typeCheckUnaryOpPrefix op t
+  typeCheckUnaryOpPrefix getLiteralType op t
 typeCheckExpr' _ (UnaryOpPostfix e op) = do
   t <- typeCheckExpr e
   typeCheckUnaryOpPostfix op t
@@ -298,7 +291,7 @@ typeCheckStmt (If condBlocks elseBlock) toReturn comp = do
   mapM_
     ( \(condBlock, block) -> do
         t <- typeCheckExpr condBlock
-        if isSubtype t TBoolean || isSubtype t TNumber -- TODO: not sure if more things should be allowed
+        if isSubtype t TBoolean || isSubtype t TNumber
           then createNewUserTypeEnv $ createNewVarEnv $ typeCheckBlock block toReturn
           else throwError $ TypeError "expected boolean type"
     )
@@ -314,7 +307,7 @@ typeCheckStmt (For varInit guard incr block) toReturn comp = do
           Nothing
           ( do
               t <- typeCheckExpr guard
-              if isSubtype t TBoolean || isSubtype t TNumber -- TODO: not sure if more things should be allowed
+              if isSubtype t TBoolean || isSubtype t TNumber
                 then do
                   _ <- typeCheckExpr incr
                   typeCheckBlock block toReturn
@@ -323,7 +316,7 @@ typeCheckStmt (For varInit guard incr block) toReturn comp = do
   comp
 typeCheckStmt (While e block) toReturn comp = do
   t <- typeCheckExpr e
-  if isSubtype t TBoolean || isSubtype t TNumber -- TODO: not sure if more things should be allowed
+  if isSubtype t TBoolean || isSubtype t TNumber
     then do
       _ <- createNewUserTypeEnv $ createNewVarEnv $ typeCheckBlock block toReturn
       comp
@@ -346,7 +339,6 @@ typeCheckStmt (Return maybeExp) toReturn comp = do
           if isSubtype t t' then comp else throwError $ TypeError "type mismatch"
         Nothing -> if isSubtype TVoid t' then comp else throwError $ TypeError "type mismatch"
     Nothing -> throwError $ TypeError "cannot return in this context"
--- TODO: functions
 typeCheckStmt (TypeAlias n t) _ comp =
   putUserTypeEnv n t comp
 typeCheckStmt (InterfaceDeclaration n t) _ comp =
@@ -368,5 +360,5 @@ typeCheckProgram ::
 typeCheckProgram b = do
   env <- runReaderT (typeCheckBlock b Nothing) initialTSTypeEnv
   case varEnvs env of
-    [] -> throwError $ TypeError "empty env" -- TODO: returning empty instead of throwing error, but this should never happen
+    [] -> throwError $ TypeError "empty env"
     currEnv : _ -> return currEnv

@@ -602,7 +602,7 @@ annotatedExpP = do
 prefixExpP :: Parser Expression
 prefixExpP =
   tryChoice
-    [ Lit . NumberLiteral <$> (NInfinity <$ stringIso "-Infinity"),
+    [ -- Lit . NumberLiteral <$> (NInfinity <$ stringIso "-Infinity"),
       UnaryOpPrefix <$> uopPrefixP <*> prefixExpP,
       annotatedExpP
     ]
@@ -746,10 +746,10 @@ tryP = do
       [ -- Attempt to parse catch + optional finally
         do
           _ <- stringIsoP "catch"
-          e <- parens expP
+          e <- P.option Nothing (Just <$> parens expP)
           cblock <- braces blockP
           fblock <- P.option (Block []) (stringIsoP "finally" *> braces blockP)
-          return (Just e, cblock, fblock),
+          return (e, cblock, fblock),
         -- If no catch, try finally
         do
           fblock <- stringIsoP "finally" *> braces blockP
@@ -888,7 +888,7 @@ test_literal =
       [ parse
           (many literalP)
           "1 2\n 3"
-          ~?= Right [NumberLiteral 1, NumberLiteral 2, NumberLiteral 3],
+          ~?= Right [NumberLiteral (Double 1), NumberLiteral (Double 2), NumberLiteral (Double 3)],
         parse
           (many literalP)
           "true false\n true"
@@ -931,7 +931,7 @@ test_stat :: Test
 test_stat =
   "parsing statements"
     ~: TestList
-      [ parse statementP "const x = 3" ~?= Right (ConstAssignment (Name "x") (Lit (NumberLiteral 3))),
+      [ parse statementP "const x = 3" ~?= Right (ConstAssignment (Name "x") (Lit (NumberLiteral (Double 3)))),
         parse statementP "if (x) { let y = undefined; } else { const y = null }"
           ~?= Right
             ( If

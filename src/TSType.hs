@@ -205,7 +205,7 @@ basicTypes =
   ]
 
 genMap :: Int -> Gen (Map String TSType)
-genMap 0 = return Map.empty
+genMap 0 = Map.fromList <$> QC.vectorOf 2 ((,) <$> genNameType <*> QC.elements basicTypes)
 genMap n = Map.fromList <$> QC.vectorOf 2 ((,) <$> genNameType <*> genMapType n)
 
 genMapType :: Int -> Gen TSType
@@ -239,6 +239,9 @@ genType n =
     ]
   where
     n' = n `div` 2
+
+genObjectType :: Int -> Gen TSType
+genObjectType n = TUserObject <$> genMap n
 
 genTypeExceptNever :: Int -> Gen TSType
 genTypeExceptNever 0 =
@@ -283,9 +286,9 @@ instance Arbitrary TSType where
   shrink :: TSType -> [TSType]
   shrink (TArray t) = TArray <$> shrink t
   shrink (TTuple ts) = TTuple <$> shrink ts
-  shrink (TUserObject m) = TUserObject <$> shrink m
-  shrink (TUnion ts) = TUnion <$> shrink ts
-  shrink (TIntersection ts) = TIntersection <$> shrink ts
+  shrink (TUserObject m) = []
+  shrink (TUnion ts) = [simplify (TUnion ts)]
+  shrink (TIntersection ts) = [simplify (TIntersection ts)]
   shrink _ = []
 
 type TSTypeChecker = ReaderT TSTypeEnv (Either Error)

@@ -4,6 +4,7 @@ import Control.Monad (guard)
 import Control.Monad.Reader
 import Data.Char qualified as Char
 import Data.Map qualified as Map
+import TSNumber
 import TSSyntax
 import TSType
 import TSTypeChecker (typeCheckExpr)
@@ -35,7 +36,7 @@ genLiteral n =
       (1, pure NullLiteral),
       (1, pure UndefinedLiteral),
       (n, StringLiteral <$> genStringLit),
-      (n, ObjectLiteral . Map.fromList <$> QC.vectorOf 1 ((,) <$> genStringLit <*> genExp n'))
+      (n', ObjectLiteral . Map.fromList <$> QC.vectorOf 1 ((,) <$> genStringLit <*> genExp n'))
     ]
   where
     n' = n `div` 2
@@ -79,13 +80,13 @@ genCatch = QC.oneof [Var . Name <$> genName, AnnotatedExpression <$> arbitrary <
 
 -- | Generate a size-controlled statement
 genStatement :: Int -> Gen Statement
-genStatement n | n <= 1 = QC.oneof [ConstAssignment <$> genVar 0 <*> genExp 0]
+genStatement n | n <= 1 = ConstAssignment <$> genVar 0 <*> genExp 0
 genStatement n =
   QC.frequency
     [ (1, (ConstAssignment . Name <$> genName) <*> genAnnotatedExp n'),
       (1, (LetAssignment . Name <$> genName) <*> genAnnotatedExp n'),
       (1, TypeAlias <$> genName <*> arbitrary),
-      (1, InterfaceDeclaration <$> genName <*> arbitrary),
+      (1, InterfaceDeclaration <$> genName <*> genObjectType 1),
       (n, AnyExpression <$> genExp n'),
       (n, If <$> QC.vectorOf 1 ((,) <$> genExp n' <*> genBlock n') <*> genBlock n'),
       (n, Return <$> makeGenMaybe (genExp n')),
@@ -134,7 +135,7 @@ instance Arbitrary Statement where
   shrink (ConstAssignment v e) = [ConstAssignment v' e | v' <- shrink v] ++ [ConstAssignment v e' | e' <- shrink e]
   shrink (LetAssignment v e) = [LetAssignment v' e | v' <- shrink v] ++ [LetAssignment v e' | e' <- shrink e]
   shrink (If ebs elseBlock) =
-    [If ebs' elseBlock | ebs' <- shrink ebs] ++ [If ebs elseBlock' | elseBlock' <- shrink elseBlock]
+    [If ebs elseBlock' | elseBlock' <- shrink elseBlock]
   shrink (For v e guard b) = [For v' e guard b | v' <- shrink v] ++ [For v e' guard b | e' <- shrink e] ++ [For v e guard b' | b' <- shrink b]
   shrink (While e b) = [While e' b | e' <- shrink e] ++ [While e b' | b' <- shrink b]
   shrink (Try b maybeE catchBlock finallyBlock) =
