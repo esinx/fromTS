@@ -50,6 +50,7 @@ library
       TSTranspiler
       TSTypeChecker
       TSType
+      TSGen
       Model
       -- if you add modules to your project, list them here
       -- so that they will be available to the executable and test suite
