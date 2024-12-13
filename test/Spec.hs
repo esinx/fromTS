@@ -10,6 +10,7 @@ import GHC.IO.Exception (ExitCode (ExitFailure, ExitSuccess))
 import Model
 import System.Process (readProcessWithExitCode)
 import TSError
+import TSGen
 import TSParser
 import TSSyntax
 import TSType
@@ -32,6 +33,8 @@ main = do
   -- typechecker
   putStrLn "test_model"
   runTestTT test_model
+  putStrLn "differential"
+  quickCheckN 100 prop_differential
   putStrLn "--- All tests complete ---"
 
 -- runTestTT test_typeChecker
@@ -326,12 +329,12 @@ prop_func s1 s2 t1 t2 =
   isSubtype t1 s1 && isSubtype s2 t2 ==>
     isSubtype (TFunction [s1] s2) (TFunction [t1] t2)
 
-prop_differential :: Block -> Property
-prop_differential = ioProperty . prop_ioDifferential
+prop_differential :: Filename -> Block -> Property
+prop_differential filename = ioProperty . prop_ioDifferential filename
 
-prop_ioDifferential :: Block -> IO Property
-prop_ioDifferential b =
-  let outputFile = "test/temp.ts"
+prop_ioDifferential :: Filename -> Block -> IO Property
+prop_ioDifferential (Filename fn) b =
+  let outputFile = "test/temp/" ++ fn ++ ".ts"
    in do
         writeFile outputFile $ pretty b
         result <- compareToModel outputFile
