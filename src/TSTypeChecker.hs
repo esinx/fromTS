@@ -342,10 +342,6 @@ typeCheckStmt (Return (Just e)) toReturn comp = do
   case toReturn of
     Just t' -> if isSubtype t t' then comp else throwError $ TypeError "type mismatch"
     Nothing -> throwError $ TypeError "cannot return in this context"
-typeCheckStmt (Return Nothing) toReturn comp = do
-  case toReturn of
-    Just t' -> if isSubtype t' (TUnion [TVoid, TUndefined]) then comp else throwError $ TypeError "type mismatch"
-    Nothing -> comp
 -- TODO: functions
 typeCheckStmt (TypeAlias n t) _ comp =
   putUserTypeEnv n t comp
