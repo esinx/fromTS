@@ -76,10 +76,42 @@ if (true) {
     let val = "5 == 6";
 } else if (5 - 7 < 21) val2 = true;
 
+else {
+    test1 = true;
+}
+
+if (false) {
+    let val = "5 != 6";
+} else if (5 - 7 > 21) val3 = false;
+
+if (5 == 6) {
+    let val = "5 != 6";
+} else {
+    let val = "5 == 6";
+}
+
+while (true) {
+    let val = "5 == 6";
+}
+
 try {
     5 + 6;
 } catch (a: any) {
     const names = ["a", "b", "c"];
+}
+
+try {
+    5 + 6;
+} catch {
+    const names = ["a", "b", "c"];
+} finally {
+    let val = 7;
+}
+
+try {
+    5 + 6;
+} finally {
+    let val = 7;
 }
 
 // if (true) while (false) for (;;) console.log(":(");
