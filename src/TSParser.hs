@@ -12,6 +12,7 @@ import Data.Set (singleton)
 import Data.Void (Void)
 import System.IO qualified as IO
 import System.IO.Error qualified as IO
+import TSGen
 import TSNumber
 import TSSyntax
 import TSType

@@ -34,10 +34,6 @@ data Statement
   | Continue
   | Try Block (Maybe Expression) Block Block -- try { s1 } catch (e) { s2 } finally { s3 }
   | Return (Maybe Expression)
-  | FunctionDeclaration Expression -- I was thinking of using this as a wrapper of FunctionExpression?
-  | FunctionCall Expression -- f(e1, ..., en)
-  | TypeAlias Name TSType
-  | InterfaceDeclaration Name TSType
   | Empty
   deriving (Eq, Show)
 
@@ -48,8 +44,6 @@ data Expression
   | UnaryOpPrefix UopPrefix Expression -- unary operators
   | UnaryOpPostfix Expression UopPostfix -- unary operators
   | BinaryOp Expression Bop Expression -- binary operators
-  -- I am kind of confused about the [Expression], shouldn't it be statements?
-  | FunctionExpression (Maybe String) [Expression] Block -- function (x, y) { s } and (x, y) => s
   | Array [Expression] -- [e1, ..., en]
   deriving (Eq, Show)
 
@@ -298,7 +292,6 @@ instance PP Expression where
           ppPrec (level bop) e1 <+> pp bop <+> ppPrec (level bop + 1) e2
       ppPrec _ e' = pp e'
       ppParens b = if b then PP.parens else id
-  pp (FunctionExpression {}) = undefined -- TODO: finish this
   pp (Array es) = PP.brackets (PP.hcat (PP.punctuate PP.comma (map pp es)))
 
 -- instance PP TableField where
@@ -392,10 +385,6 @@ instance PP Statement where
            )
   pp (Return Nothing) = PP.text "return"
   pp (Return (Just e)) = PP.text "return" <+> pp e
-  pp (FunctionDeclaration e) = undefined
-  pp (FunctionCall e) = undefined
-  pp (TypeAlias n t) = PP.text "type" <+> pp n <+> PP.equals <+> pp t
-  pp (InterfaceDeclaration n t) = PP.text "interface" <+> pp n <+> PP.equals <+> pp t
   pp Empty = PP.empty
 
 level :: Bop -> Int
@@ -442,220 +431,5 @@ level b = case b of
   Mod -> 13
   Exp -> 14
 
--- >>> pretty (Block [ConstAssignment (Name "num") (Lit (NumberLiteral 42)),ConstAssignment (Name "str") (Lit (StringLiteral "literal-string")),ConstAssignment (Name "boolTrue") (AnnotatedExpression (TBooleanLiteral False) (Lit (BooleanLiteral True))),ConstAssignment (Name "boolFalse") (AnnotatedExpression TBoolean (Lit (BooleanLiteral False))),ConstAssignment (Name "constObj") (AnnotatedExpression (TTuple [TNumber,TBoolean]) (Lit (ObjectLiteral (fromList [("key",Lit (StringLiteral "value"))])))),ConstAssignment (Name "obj") (Lit (ObjectLiteral (fromList [("key",Lit (StringLiteral "value")),("key2",Lit (NumberLiteral 42))]))),ConstAssignment (Name "arrOfNum") (Array [Lit (NumberLiteral 1),Lit (NumberLiteral 2),Lit (NumberLiteral 3)]),ConstAssignment (Name "arrOfStr") (Array [Lit (StringLiteral "a"),Lit (StringLiteral "b"),Lit (StringLiteral "c")]),ConstAssignment (Name "arrOfBool") (Array [Lit (BooleanLiteral True),Lit (BooleanLiteral False),Lit (BooleanLiteral True)]),ConstAssignment (Name "arrOfObj") (Array [Lit (ObjectLiteral (fromList [("key",Lit (StringLiteral "value"))])),Lit (ObjectLiteral (fromList [("key",Lit (StringLiteral "value"))]))]),ConstAssignment (Name "arrOfArr") (Array [Array [Lit (NumberLiteral 1),Lit (NumberLiteral 2),Lit (NumberLiteral 3)],Array [Lit (StringLiteral "a"),Lit (StringLiteral "b"),Lit (StringLiteral "c")]]),ConstAssignment (Name "arrOfMixed") (Array [Lit (NumberLiteral 1),Lit (StringLiteral "a"),Lit (BooleanLiteral True),Lit (ObjectLiteral (fromList [("key",Lit (StringLiteral "value"))])),Array [Lit (NumberLiteral 1),Lit (NumberLiteral 2),Lit (NumberLiteral 3)]]),ConstAssignment (Name "nullLiteral") (Lit NullLiteral),ConstAssignment (Name "decimal") (AnnotatedExpression TNumber (Lit (NumberLiteral 42))),ConstAssignment (Name "decimalFloat") (UnaryOpPrefix MinusUop (Lit (NumberLiteral 42.42))),ConstAssignment (Name "binary") (Lit (NumberLiteral 42)),ConstAssignment (Name "octal") (AnnotatedExpression TString (UnaryOpPrefix MinusUop (Lit (NumberLiteral 42)))),ConstAssignment (Name "hexadecimal") (Lit (NumberLiteral 42)),ConstAssignment (Name "scientific") (BinaryOp (BinaryOp (BinaryOp (BinaryOp (UnaryOpPrefix MinusUop (Lit (NumberLiteral 42))) Times (BinaryOp (Lit (NumberLiteral 100)) Exp (Lit (NumberLiteral 2)))) LeftShift (Lit (NumberLiteral 4))) Div (Lit (NumberLiteral 4.2))) BitOr (Lit (NumberLiteral 93))),ConstAssignment (Name "scientificNegative") (Lit (NumberLiteral 0.42000000000000004)),ConstAssignment (Name "infinity") (Lit (NumberLiteral Infinity)),ConstAssignment (Name "negativeInfinity") (UnaryOpPrefix MinusUop (Lit (NumberLiteral Infinity))),ConstAssignment (Name "nan") (Lit (NumberLiteral NaN)),For (LetAssignment (Name "x") (Lit (NumberLiteral 0))) (BinaryOp (Var (Name "x")) Lt (Lit (NumberLiteral 10))) (UnaryOpPostfix (Var (Name "x")) IncPost) (Block [AnyExpression (BinaryOp (Var (Name "i")) Assign (Var (Name "x")))]),If [(Lit (BooleanLiteral True),Block [LetAssignment (Name "val") (Lit (StringLiteral "5 == 6"))]),(BinaryOp (BinaryOp (Lit (NumberLiteral 5)) MinusBop (Lit (NumberLiteral 7))) Lt (Lit (NumberLiteral 21)),Block [AnyExpression (BinaryOp (Var (Name "val2")) Assign (Lit (BooleanLiteral True)))])] (Block []),Try (Block [AnyExpression (BinaryOp (Lit (NumberLiteral 5)) PlusBop (Lit (NumberLiteral 6)))]) (Just (AnnotatedExpression TAny (Var (Name "a")))) (Block [ConstAssignment (Name "names") (Array [Lit (StringLiteral "a"),Lit (StringLiteral "b"),Lit (StringLiteral "c")])]) (Block []),TypeAlias "MyType" (TUnion [TNumber,TString,TBoolean]),ConstAssignment (Name "test") (AnnotatedExpression (TTypeAlias "MyType") (Lit (NumberLiteral 5))),TypeAlias "MyType2" (TUserObject (fromList [("field1",TNumber),("field2",TUnion [TString,TUndefined]),("field3",TUnion [TBoolean,TTypeAlias "MyType"]),("field4",TArray (TUnion [TNumber,TUnion [TTypeAlias "MyType2",TTypeAlias "MyType"]])),("test field",TNumberLiteral 5.0)])),InterfaceDeclaration "MyType3" (TUserObject (fromList [("field1",TNumber),("field2",TString),("field3",TUnion [TUnion [TBoolean,TTypeAlias "MyType"],TUndefined]),("field4",TUnion [TUnion [TNumber,TArray (TUnion [TTypeAlias "MyType2",TTypeAlias "MyType"])],TUndefined])]))])
--- "const num = 42\nconst str = \"literal-string\"\nconst boolTrue = false: true\nconst boolFalse = boolean: false\nconst constObj = [number,boolean]: {key: \"value\"}\nconst obj = {key: \"value\", key2: 42}\nconst arrOfNum = [1,2,3]\nconst arrOfStr = [\"a\",\"b\",\"c\"]\nconst arrOfBool = [true,false,true]\nconst arrOfObj = [{key: \"value\"},{key: \"value\"}]\nconst arrOfArr = [[1,2,3],[\"a\",\"b\",\"c\"]]\nconst arrOfMixed = [1,\"a\",true,{key: \"value\"},[1,2,3]]\nconst nullLiteral = null\nconst decimal = number: 42\nconst decimalFloat = -42.42\nconst binary = 42\nconst octal = string: -42\nconst hexadecimal = 42\nconst scientific = (-42 * 100 ** 2 << 4) / 4.2 | 93\nconst scientificNegative = 0.42000000000000004\nconst infinity = Infinity\nconst negativeInfinity = -Infinity\nconst nan = NaN\nfor (let x = 0; x < 10; x) { i = x\n}\nif (true) { let val = \"5 == 6\"\n} elseif (5 - 7 < 21) { val2 = true\n}\ntry { 5 + 6\n} catch (any: a) {\n   const names = [\"a\",\"b\",\"c\"]\n }\ntype MyType = number |  string |  boolean\nconst test = MyType: 5\ntype MyType2 = {field1: number,\n                field2: string |  undefined,\n                field3: boolean |  MyType,\n                field4: number |  MyType2 |  MyType[],\n                test field: 5}\ninterface MyType3 = {field1: number,\n                     field2: string,\n                     field3: boolean |  MyType |  undefined,\n                     field4: number |  MyType2 |  MyType[] |  undefined}"
-
-sampleVar :: IO ()
-sampleVar = QC.sample' (arbitrary :: Gen Var) >>= mapM_ (print . pp)
-
-sampleExp :: IO ()
-sampleExp = QC.sample' (arbitrary :: Gen Expression) >>= mapM_ (print . pp)
-
-sampleStat :: IO ()
-sampleStat = QC.sample' (arbitrary :: Gen Statement) >>= mapM_ (print . pp)
-
-quickCheckN :: (QC.Testable prop) => Int -> prop -> IO ()
-quickCheckN n = QC.quickCheckWith $ QC.stdArgs {QC.maxSuccess = n, QC.maxSize = 100}
-
--- | Generate a small set of names for generated tests. These names are guaranteed to not include
--- reserved words
-genName :: Gen Name
-genName = QC.elements ["x", "X", "y", "x0", "X0", "xy", "XY"]
-
--- | Generate a string literal, being careful about the characters that it may contain
-genStringLit :: Gen String
-genStringLit = escape <$> QC.listOf (QC.elements stringLitChars)
-  where
-    -- escape special characters appearing in the string,
-    escape :: String -> String
-    escape = foldr Char.showLitChar ""
-    -- generate strings containing printable characters or spaces, but not including '\"'
-    stringLitChars :: [Char]
-    stringLitChars = filter (\c -> c /= '\"' && (Char.isSpace c || Char.isPrint c)) ['\NUL' .. '~']
-
--- | Generate a size-controlled global variable or table field
-genVar :: Int -> Gen Var
--- genVar 0 = Name <$> genName
--- genVar n =
---   QC.frequency
---     [ (1, Name <$> genName),
---       (n, Dot <$> genExp n' <*> genName)
---       (n, Proj <$> genExp n' <*> genExp n')
---     ]
---   where
---     n' = n `div` 2
-genVar _ = undefined
-
--- | Generate a size-controlled expression
-genExp :: Int -> Gen Expression
--- genExp 0 = QC.oneof [Var <$> genVar 0, Val <$> arbitrary]
--- genExp n =
---   QC.frequency
---     [ (1, Var <$> genVar n),
---       (1, Val <$> arbitrary),
---       (n, Op1 <$> arbitrary <*> genExp n'),
---       (n, Op2 <$> genExp n' <*> arbitrary <*> genExp n'),
---       (n', TableConst <$> genTableFields n')
---     ]
---   where
---     n' = n `div` 2
-genExp _ = undefined
-
--- -- | Generate a list of fields in a table constructor expression.
--- -- We limit the size of the table to avoid size blow up.
--- genTableFields :: Int -> Gen [TableField]
--- genTableFields n = do
---   len <- QC.elements [0 .. 3]
---   take len <$> QC.infiniteListOf (genTableField n)
-
--- genTableField :: Int -> Gen TableField
--- genTableField n =
---   QC.oneof
---     [ FieldName <$> genName <*> genExp n',
---       FieldKey <$> genExp n' <*> genExp n'
---     ]
---   where
---     n' = n `div` 2
-
--- | Generate a size-controlled statement
-genStatement :: Int -> Gen Statement
--- genStatement n | n <= 1 = QC.oneof [Assign <$> genVar 0 <*> genExp 0, return Empty]
--- genStatement n =
---   QC.frequency
---     [ (1, Assign <$> genVar n' <*> genExp n'),
---       (1, return Empty),
---       (n, If <$> genExp n' <*> genBlock n' <*> genBlock n'),
---       -- generate loops half as frequently as if statements
---       (n', While <$> genExp n' <*> genBlock n'),
---       (n', Repeat <$> genBlock n' <*> genExp n')
---     ]
---   where
---     n' = n `div` 2
-genStatement _ = undefined
-
-genBlock :: Int -> Gen Block
-genBlock n = Block <$> genStmts n
-  where
-    genStmts 0 = pure []
-    genStmts n =
-      QC.frequency
-        [ (1, return []),
-          (n, (:) <$> genStatement n' <*> genStmts n')
-        ]
-      where
-        n' = n `div` 2
-
-instance Arbitrary Var where
-  arbitrary :: Gen Var
-  arbitrary = QC.sized genVar
-
-  shrink :: Var -> [Var]
-  shrink (Name n) = []
-  shrink (Element e1 e2) =
-    [Element e1' e2 | e1' <- shrink e1] ++ [Element e1 e2' | e2' <- shrink e2]
-  shrink (Dot e n) = [Dot e' n | e' <- shrink e]
-
-instance Arbitrary Statement where
-  arbitrary :: Gen Statement
-  arbitrary = QC.sized genStatement
-
-  shrink :: Statement -> [Statement]
-  -- shrink (Assign v e) =
-  --   [Assign v' e | v' <- shrink v]
-  --     ++ [Assign v e' | e' <- shrink e]
-  -- shrink (If e b1 b2) =
-  --   first b1
-  --     ++ first b2
-  --     ++ [If e' b1 b2 | e' <- shrink e]
-  --     ++ [If e b1' b2 | b1' <- shrink b1]
-  --     ++ [If e b1 b2' | b2' <- shrink b2]
-  -- shrink (While e b) =
-  --   first b
-  --     ++ [While e' b | e' <- shrink e]
-  --     ++ [While e b' | b' <- shrink b]
-  -- shrink (Repeat b e) =
-  --   first b
-  --     ++ [Repeat b' e | b' <- shrink b]
-  --     ++ [Repeat b e' | e' <- shrink e]
-  -- shrink Empty = []
-  shrink _ = undefined
-
--- | access the first statement in a block, if one exists
-first :: Block -> [Statement]
-first (Block []) = []
-first (Block (x : _)) = [x]
-
--- -- | access expressions in a table field
--- getExp :: TableField -> [Expression]
--- getExp (FieldName _ e) = [e]
--- getExp (FieldKey e1 e2) = [e1, e2]
-
--- instance Arbitrary TableField where
---   arbitrary :: Gen TableField
---   arbitrary = QC.sized genTableField
---   shrink :: TableField -> [TableField]
---   shrink (FieldName n e1) = [FieldName n e1' | e1' <- shrink e1]
---   shrink (FieldKey e1 e2) =
---     [FieldKey e1' e2 | e1' <- shrink e1]
---       ++ [FieldKey e1 e2' | e2' <- shrink e2]
-
-instance Arbitrary Block where
-  arbitrary :: Gen Block
-  arbitrary = QC.sized genBlock
-  shrink :: Block -> [Block]
-  shrink (Block ss) = [Block ss' | ss' <- shrink ss]
-
-instance Arbitrary Expression where
-  arbitrary :: Gen Expression
-  arbitrary = QC.sized genExp
-
-  shrink :: Expression -> [Expression]
-  shrink (Var v) = Var <$> shrink v
-  shrink (Lit l) = Lit <$> shrink l
-  shrink (AnnotatedExpression t e) =
-    e
-      : [AnnotatedExpression t' e | t' <- shrink t]
-      ++ [AnnotatedExpression t e' | e' <- shrink e]
-  shrink (UnaryOpPrefix o e) = e : [UnaryOpPrefix o e' | e' <- shrink e]
-  shrink (UnaryOpPostfix e o) = e : [UnaryOpPostfix e' o | e' <- shrink e]
-  shrink (BinaryOp e1 o e2) =
-    [BinaryOp e1' o e2 | e1' <- shrink e1]
-      ++ [BinaryOp e1 o e2' | e2' <- shrink e2]
-      ++ [e1, e2]
-  shrink (FunctionExpression n es b) = undefined -- TODO: finish this
-  shrink (Array es) = Array <$> shrink es
-
-instance Arbitrary UopPrefix where
-  arbitrary :: Gen UopPrefix
-  arbitrary = QC.arbitraryBoundedEnum
-
-instance Arbitrary UopPostfix where
-  arbitrary :: Gen UopPostfix
-  arbitrary = QC.arbitraryBoundedEnum
-
-instance Arbitrary Bop where
-  arbitrary :: Gen Bop
-  arbitrary = QC.arbitraryBoundedEnum
-
-shrinkStringLit :: String -> [String]
-shrinkStringLit s = filter (/= '\"') <$> shrink s
-
-instance Arbitrary Literal where
-  arbitrary :: Gen Literal
-  arbitrary =
-    QC.oneof
-      [ NumberLiteral <$> arbitrary,
-        BooleanLiteral <$> arbitrary,
-        pure NullLiteral,
-        pure UndefinedLiteral,
-        StringLiteral <$> genStringLit
-        -- TODO: add Objects
-      ]
-
-  shrink :: Literal -> [Literal]
-  shrink (NumberLiteral n) = NumberLiteral <$> shrink n
-  shrink (BooleanLiteral b) = BooleanLiteral <$> shrink b
-  shrink NullLiteral = []
-  shrink UndefinedLiteral = []
-  shrink (StringLiteral s) = StringLiteral <$> shrinkStringLit s
-  shrink (ObjectLiteral m) = ObjectLiteral <$> shrink m
+-- >>> pretty ((Block [ConstAssignment (Name "num") (Lit (NumberLiteral 42)),ConstAssignment (Name "str") (Lit (StringLiteral "literal-string")),ConstAssignment (Name "boolTrue") (Lit (BooleanLiteral True)),ConstAssignment (Name "boolFalse") (Lit (BooleanLiteral False)),ConstAssignment (Name "arrOfNum") (Array [BinaryOp (BinaryOp (Lit (NumberLiteral 1)) Comma (Lit (NumberLiteral 2))) Comma (Lit (NumberLiteral 3))]),ConstAssignment (Name "arrOfStr") (Array [BinaryOp (BinaryOp (Lit (StringLiteral "a")) Comma (Lit (StringLiteral "b"))) Comma (Lit (StringLiteral "c"))]),ConstAssignment (Name "arrOfBool") (Array [BinaryOp (BinaryOp (Lit (BooleanLiteral True)) Comma (Lit (BooleanLiteral False))) Comma (Lit (BooleanLiteral True))]),ConstAssignment (Name "nullLiteral") (Lit NullLiteral),ConstAssignment (Name "decimal") (Lit (NumberLiteral 42)),ConstAssignment (Name "decimalFloat") (UnaryOpPrefix MinusUop (Lit (NumberLiteral 42.42))),ConstAssignment (Name "binary") (Lit (NumberLiteral 42)),ConstAssignment (Name "octal") (UnaryOpPrefix MinusUop (Lit (NumberLiteral 42))),ConstAssignment (Name "hexadecimal") (Lit (NumberLiteral 42)),ConstAssignment (Name "scientific") (BinaryOp (BinaryOp (BinaryOp (BinaryOp (UnaryOpPrefix MinusUop (Lit (NumberLiteral 42.0))) Times (BinaryOp (Lit (NumberLiteral 100)) Exp (Lit (NumberLiteral 2)))) LeftShift (Lit (NumberLiteral 4))) Div (Lit (NumberLiteral 4.2))) BitOr (Lit (NumberLiteral 93))),ConstAssignment (Name "scientificNegative") (Lit (NumberLiteral 0.42000000000000004)),ConstAssignment (Name "infinity") (Lit (NumberLiteral Infinity)),ConstAssignment (Name "negativeInfinity") (UnaryOpPrefix MinusUop (Lit (NumberLiteral Infinity))),ConstAssignment (Name "nan") (Lit (NumberLiteral NaN))]))
+-- "const num = 42\nconst str = \"literal-string\"\nconst boolTrue = true\nconst boolFalse = false\nconst arrOfNum = [1, 2, 3]\nconst arrOfStr = [\"a\", \"b\", \"c\"]\nconst arrOfBool = [true, false, true]\nconst nullLiteral = null\nconst decimal = 42\nconst decimalFloat = -42.42\nconst binary = 42\nconst octal = -42\nconst hexadecimal = 42\nconst scientific = (-42 * 100 ** 2 << 4) / 4.2 | 93\nconst scientificNegative = 0.42000000000000004\nconst infinity = Infinity\nconst negativeInfinity = -Infinity\nconst nan = NaN"
