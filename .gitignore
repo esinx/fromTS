@@ -4,4 +4,3 @@
 dist-newstyle
 node_modules
 test/output.*
-test/temp/*.ts
