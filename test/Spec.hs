@@ -37,27 +37,20 @@ main = do
   runTestTT test_model
   putStrLn "differential"
   quickCheckN 100 prop_differential
+  runTestTT test_typeChecker
+  putStrLn "subtypeReflexive"
+  quickCheckN 100 prop_subtypeReflexive
+  putStrLn "properBottomTypeNever"
+  quickCheckN 100 prop_properBottomTypeNever
+  putStrLn "properTopTypeUnknown"
+  quickCheckN 100 prop_properTopTypeUnknown
+  putStrLn "chaoticTopTypeAny"
+  quickCheckN 100 prop_chaoticTopTypeAny
+  putStrLn "chaoticBottomTypeAny"
+  quickCheckN 100 prop_chaoticBottomTypeAny
+  putStrLn "transitiveExceptAny"
+  quickCheckN 100 prop_transitiveExceptAny
   putStrLn "--- All tests complete ---"
-
--- runTestTT test_typeChecker
--- putStrLn "subtypeReflexive"
--- quickCheckN 100 prop_subtypeReflexive
--- putStrLn "properBottomTypeNever"
--- quickCheckN 100 prop_properBottomTypeNever
--- putStrLn "properTopTypeUnknown"
--- quickCheckN 100 prop_properTopTypeUnknown
--- putStrLn "chaoticTopTypeAny"
--- quickCheckN 100 prop_chaoticTopTypeAny
--- putStrLn "chaoticBottomTypeAny"
--- quickCheckN 100 prop_chaoticBottomTypeAny
--- putStrLn "asymmetricExceptAny"
--- quickCheckN 100 prop_asymmetricExceptAny
--- putStrLn "transitiveExceptAny"
--- quickCheckN 100 prop_transitiveExceptAny
--- putStrLn "func"
--- quickCheckN 100 prop_func
--- putStrLn "differential"
--- quickCheckN 100 prop_differential
 
 -- unit tests for the typechecker
 test_typeChecker :: Test
