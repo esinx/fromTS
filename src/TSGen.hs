@@ -4,6 +4,7 @@ import Control.Monad (guard)
 import Control.Monad.Reader
 import Data.Char qualified as Char
 import Data.Map qualified as Map
+import GHC.List qualified as List
 import TSNumber
 import TSSyntax
 import TSType
@@ -131,24 +132,13 @@ instance Arbitrary Statement where
   arbitrary = QC.sized genStatement
 
   shrink :: Statement -> [Statement]
-  shrink (AnyExpression e) = [AnyExpression e' | e' <- shrink e]
-  shrink (ConstAssignment v e) = [ConstAssignment v' e | v' <- shrink v] ++ [ConstAssignment v e' | e' <- shrink e]
-  shrink (LetAssignment v e) = [LetAssignment v' e | v' <- shrink v] ++ [LetAssignment v e' | e' <- shrink e]
-  shrink (If ebs elseBlock) =
-    [If ebs elseBlock' | elseBlock' <- shrink elseBlock]
-  shrink (For v e guard b) = [For v' e guard b | v' <- shrink v] ++ [For v e' guard b | e' <- shrink e] ++ [For v e guard b' | b' <- shrink b]
-  shrink (While e b) = [While e' b | e' <- shrink e] ++ [While e b' | b' <- shrink b]
-  shrink (Try b maybeE catchBlock finallyBlock) =
-    [Try b' maybeE catchBlock finallyBlock | b' <- shrink b]
-      ++ [Try b maybeE' catchBlock finallyBlock | maybeE' <- shrink maybeE]
-      ++ [Try b maybeE catchBlock' finallyBlock | catchBlock' <- shrink catchBlock]
-      ++ [Try b maybeE catchBlock finallyBlock' | finallyBlock' <- shrink finallyBlock]
-  shrink (TypeAlias n t) = [TypeAlias n t' | t' <- shrink t]
-  shrink (InterfaceDeclaration n t) = [InterfaceDeclaration n t' | t' <- shrink t]
-  shrink (Return e) = [Return e' | e' <- shrink e]
-  shrink Empty = []
-  shrink Break = []
-  shrink Continue = []
+  shrink (If ebs (Block elseBlock)) =
+    List.foldr (\(e, Block b) acc -> b ++ acc) elseBlock ebs
+  shrink (For v e guard (Block b)) = b
+  shrink (While e (Block b)) = b
+  shrink (Try (Block b) maybeE (Block catchBlock) (Block finallyBlock)) =
+    b ++ catchBlock ++ finallyBlock
+  shrink _ = []
 
 -- | access the first statement in a block, if one exists
 first :: Block -> [Statement]
@@ -172,12 +162,9 @@ instance Arbitrary Expression where
     e
       : [AnnotatedExpression t' e | t' <- shrink t]
       ++ [AnnotatedExpression t e' | e' <- shrink e]
-  shrink (UnaryOpPrefix o e) = e : [UnaryOpPrefix o e' | e' <- shrink e]
-  shrink (UnaryOpPostfix e o) = e : [UnaryOpPostfix e' o | e' <- shrink e]
-  shrink (BinaryOp e1 o e2) =
-    [BinaryOp e1' o e2 | e1' <- shrink e1]
-      ++ [BinaryOp e1 o e2' | e2' <- shrink e2]
-      ++ [e1, e2]
+  shrink (UnaryOpPrefix o e) = e : [e]
+  shrink (UnaryOpPostfix e o) = e : [e]
+  shrink (BinaryOp e1 o e2) = [e1, e2]
   shrink (Array es) = Array <$> shrink es
 
 instance Arbitrary UopPrefix where
@@ -192,23 +179,9 @@ instance Arbitrary Bop where
   arbitrary :: Gen Bop
   arbitrary = QC.arbitraryBoundedEnum
 
-shrinkStringLit :: String -> [String]
-shrinkStringLit s = filter (/= '\"') <$> shrink s
-
-shrinkMapExpr :: Map.Map String Expression -> [Map.Map String Expression]
-shrinkMapExpr m = [Map.fromList [(s, e') | e' <- shrink e] | (s, e) <- Map.toList m]
-
 instance Arbitrary Literal where
   arbitrary :: Gen Literal
   arbitrary = QC.sized genLiteral
-
-  shrink :: Literal -> [Literal]
-  shrink (NumberLiteral n) = NumberLiteral <$> shrink n
-  shrink (BooleanLiteral b) = BooleanLiteral <$> shrink b
-  shrink NullLiteral = []
-  shrink UndefinedLiteral = []
-  shrink (StringLiteral s) = StringLiteral <$> shrinkStringLit s
-  shrink (ObjectLiteral m) = ObjectLiteral <$> shrinkMapExpr m
 
 sampleVar :: IO ()
 sampleVar = QC.sample' (arbitrary :: Gen Var) >>= mapM_ (print . pp True)

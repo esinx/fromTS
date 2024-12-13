@@ -452,7 +452,7 @@ baseTypeP =
         TUndefined <$ stringIsoP "undefined",
         TTuple <$> brackets (typeP `P.sepEndBy` stringP ","),
         -- TArray <$ stringIsoP "Array" *> abrackets typeP,
-        -- TBracket <$ braces (pure ()),
+        TBracket <$ braces (pure ()),
         objectTypeP,
         TTypeAlias <$> nameP
       ]

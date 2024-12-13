@@ -287,9 +287,7 @@ instance Arbitrary TSType where
   shrink (TArray t) = TArray <$> shrink t
   shrink (TTuple ts) = TTuple <$> shrink ts
   shrink (TUserObject m) = []
-  shrink (TUnion ts) = [simplify (TUnion ts)]
-  shrink (TIntersection ts) = [simplify (TIntersection ts)]
-  shrink _ = []
+  shrink t = [simplify t]
 
 type TSTypeChecker = ReaderT TSTypeEnv (Either Error)
 
