@@ -17,14 +17,8 @@ main = do
   args <- Env.getArgs
   case args of
     [filename] -> do
-      result <- fromTSFile filename
+      result <- fromTS filename
       case result of
         Right js -> print js
         Left err -> print err
     _ -> putStrLn "Usage: fromTS <filename>"
-
-fromTSFile :: String -> IO (Either TSError.Error String)
-fromTSFile filename = do
-  handle <- IO.openFile filename IO.ReadMode
-  str <- IO.hGetContents handle
-  fromTS str
