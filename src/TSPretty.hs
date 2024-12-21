@@ -259,7 +259,7 @@ instance PP Statement where
   pp b (AnyExpression e) = pp b e <> PP.semi
   pp b (ConstAssignment n Nothing e) = (PP.text "const" <+> pp b n <+> PP.equals <+> pp b e) <> PP.semi
   pp False (ConstAssignment n _ e) = (PP.text "const" <+> pp False n <+> PP.equals <+> pp False e) <> PP.semi
-  pp b (ConstAssignment n (Just t) e) = (PP.text "const" <+> (pp b n <> (PP.colon <+> pp b n <+> PP.equals <+> pp b e))) <> PP.semi
+  pp b (ConstAssignment n (Just t) e) = (PP.text "const" <+> (pp b n <> (PP.colon <+> pp b t <+> PP.equals <+> pp b e))) <> PP.semi
   pp b (LetAssignment n Nothing Nothing) = (PP.text "let" <+> pp b n) <> PP.semi
   pp b (LetAssignment n Nothing (Just e)) = (PP.text "let" <+> pp b n <+> PP.equals <+> pp b e) <> PP.semi
   pp False (LetAssignment n _ Nothing) = (PP.text "let" <+> pp False n) <> PP.semi
