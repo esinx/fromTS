@@ -46,6 +46,7 @@ library
       FromTS
       TSNumber
       TSSyntax
+      TSPretty
       TSError
       TSParser
       TSTypeChecker

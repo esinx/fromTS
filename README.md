@@ -4,9 +4,9 @@
 
 ## Team
 
-- [Eunsoo Shin](https://github.com/esinx) (esinx)
-- [Jordan Hochman](https://github.com/JHawk0224) (jhawkman)
-- [Katrina Liu](https://github.com/liukatkat) (katltn)
+-   [Eunsoo Shin](https://github.com/esinx) (esinx)
+-   [Jordan Hochman](https://github.com/JHawk0224) (jhawkman)
+-   [Katrina Liu](https://github.com/liukatkat) (katltn)
 
 ## Structure
 
@@ -27,6 +27,7 @@
 │   ├── TSNumber.hs -- Number type utilities
 │   ├── TSParser.hs -- Parser for TypeScript
 │   ├── TSSyntax.hs -- TypeScript AST types
+│   ├── TSPretty.hs -- Pretty printer for TypeScript types
 │   ├── TSType.hs -- Type data types
 │   ├── TSTypeChecker.hs -- Type checker
 │   └── fromTS.hs -- Main functions for the program
@@ -44,6 +45,7 @@ stack run <file.ts>
 ```
 
 To run tests, use:
+
 ```bash
 cd model; yarn install; yarn build; cd ..
 stack test
@@ -55,7 +57,7 @@ See [docs/specs.md](docs/specs.md) for a list of supported features.
 
 ## Libraries used
 
-- `pretty` for pretty printing
-- `megaparsec` for parser combinators,
-- `aeson` for JSON parsing
-- `safe` for safe indexing
+-   `pretty` for pretty printing
+-   `megaparsec` for parser combinators,
+-   `aeson` for JSON parsing
+-   `safe` for safe indexing

@@ -32,3 +32,9 @@ try {
 } catch (a: any) {
     const names = ["a", "b", "c"];
 }
+
+try {
+    5 + 6;
+} catch (a) {
+    const names = ["a", "b", "c"];
+}

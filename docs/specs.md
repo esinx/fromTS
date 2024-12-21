@@ -95,13 +95,17 @@ const arr2: string[] = ["Hello", "World"];
 -   Comma binary operator
 -   "as const"
 -   BinInt (not supported lower than ES2020 anyway)
--   Functions and function calls
--   For loops without any expressions in them (e.g. for (;;))
 -   Template strings and template literals
 -   Support nested strings (in templates)
 -   Escape characters in strings
 -   Destructuring
--   Support for "let x;" and "let x: number;" (without assignment)
+-   Async/await and promises
+-   Support for "throw"
+-   Parametric types
+-   Ternary operator
+-   Default function parameters (and ... rest parameters)
+-   Unnamed call signatures in user types and interfaces
+-   Finish "TODOs"
 -   Limited built-in type support (only has `Array.prototype.length` for now)
 -   Types with arbitrary string keys. E.g:
 

@@ -2,30 +2,28 @@ module TSParser where
 
 import Control.Applicative
 import Control.Monad (guard, mapM_)
+import Data.Bifunctor (second)
 import Data.Char qualified as Char
 import Data.Functor
 import Data.List (foldl')
 import Data.List.NonEmpty qualified as NE
 import Data.Map (Map, fromList)
 import Data.Map qualified as Map
+import Data.Maybe (fromMaybe)
 import Data.Set (singleton)
 import Data.Void (Void)
+import GHC.Float (Floating (exp))
 import System.IO qualified as IO
 import System.IO.Error qualified as IO
-import TSGen
 import TSNumber
 import TSSyntax
 import TSType
 import Test.HUnit
-import Test.QuickCheck (Arbitrary (..), Gen)
-import Test.QuickCheck qualified as QC
 import Text.Megaparsec qualified as P
 import Text.Megaparsec.Char qualified as P
 import Text.Megaparsec.Char.Lexer qualified as L
 import Text.Megaparsec.Error qualified as P
 import Text.Megaparsec.Error.Builder qualified as P
-import Text.PrettyPrint (Doc, (<+>))
-import Text.PrettyPrint qualified as PP
 import Text.Read (readMaybe)
 
 --------------------------------------------------------------------------------
@@ -413,21 +411,87 @@ nameP =
 --------------------------------------------------------------------------------
 
 -- | Primitive, Greedy
+labeledTypeP :: Parser (Maybe TSType)
+labeledTypeP = tryOptional (stringP ":" *> typeP)
+
+-- | Primitive, Greedy
+functionParamP :: Parser (Name, TSType)
+functionParamP = do
+  n <- nameP
+  isOpt <- optional (stringP "?")
+  tp <- labeledTypeP
+  let fullTp = fromMaybe TAny tp
+  let finalTp = case isOpt of
+        Just _ -> TUnion [fullTp, TUndefined]
+        Nothing -> fullTp
+  return (n, finalTp)
+
+-- | Primitive, Greedy
+functionParamListP :: Parser [(Name, TSType)]
+functionParamListP = functionParamP `P.sepEndBy` stringP ","
+
+-- | Primitive, Greedy
+functionCallP :: Parser Expression
+functionCallP = P.try $ do
+  v <- varP
+  args <- parens (expP `P.sepEndBy` stringP ",")
+  return (FunctionCall v args)
+
+-- | Primitive, Greedy
+functionInlineDeclarationP :: Parser Expression
+functionInlineDeclarationP = P.try $ do
+  params <- map (second TSTypeWrapper) <$> parens functionParamListP
+  retType <- labeledTypeP
+  stringP "=>"
+  FunctionInlineDeclaration params (TSTypeWrapper <$> retType) <$> blockOrStmtP
+
+-- | Primitive, Greedy
+altFunctionInlineDeclarationP :: Parser Expression
+altFunctionInlineDeclarationP = P.try $ do
+  _ <- stringIsoP "function"
+  params <- map (second TSTypeWrapper) <$> parens functionParamListP
+  retType <- labeledTypeP
+  block <- braces blockP
+  return (FunctionInlineDeclaration params (TSTypeWrapper <$> retType) block)
+
+--------------------------------------------------------------------------------
+
+-- | Primitive, Greedy
 typePropertyP :: Parser (String, TSType)
 typePropertyP = P.try $ do
   key <- stringValP <|> nameP
   isOpt <- optional (stringP "?")
-  stringP ":"
-  tp <- typeP
+  tp <- labeledTypeP
+  let fullTp = fromMaybe TAny tp
   let finalTp = case isOpt of
-        Just _ -> TUnion [tp, TUndefined]
-        Nothing -> tp
+        Just _ -> TUnion [fullTp, TUndefined]
+        Nothing -> fullTp
+  return (key, finalTp)
+
+-- | Primitive, Greedy
+methodSignatureTypeP :: Parser (String, TSType)
+methodSignatureTypeP = P.try $ do
+  key <- stringValP <|> nameP
+  isOpt <- optional (stringP "?")
+  params <- parens functionParamListP
+  stringP ":"
+  retType <- typeP
+  let finalTp = case isOpt of
+        Just _ -> TUnion [TFunction params retType, TUndefined]
+        Nothing -> TFunction params retType
   return (key, finalTp)
 
 -- | Primitive, Greedy
 -- TODO: stop accepting two fields on same line (not trivial)
 objectTypeP :: Parser TSType
-objectTypeP = TUserObject . fromList <$> braces (typePropertyP `P.sepEndBy` optional (stringP ";" <|> stringP ","))
+objectTypeP = TUserObject . fromList <$> braces ((methodSignatureTypeP <|> typePropertyP) `P.sepEndBy` optional (stringP ";" <|> stringP ","))
+
+-- | Primitive, Greedy
+functionTypeP :: Parser TSType
+functionTypeP = P.try $ do
+  params <- parens functionParamListP
+  stringP "=>"
+  TFunction params <$> typeP
 
 -- | Primitive, Greedy
 baseTypeP :: Parser TSType
@@ -471,7 +535,7 @@ parseArrays base =
 -- | Non-Primitive, Greedy
 primaryTypeP :: Parser TSType
 primaryTypeP = wsP $ do
-  base <- P.try baseTypeP <|> parens typeP
+  base <- P.try baseTypeP <|> functionTypeP <|> parens typeP
   parseArrays base
 
 -- | Primitive, Greedy
@@ -586,19 +650,13 @@ baseExpP :: Parser Expression
 baseExpP =
   tryChoice
     [ Array <$> brackets (expP `P.sepEndBy` stringP ","),
+      altFunctionInlineDeclarationP,
+      functionInlineDeclarationP,
+      functionCallP,
       Lit <$> literalP,
       Var <$> varP,
       parens expP
     ]
-
--- | Non-Primitive, Greedy
-annotatedExpP :: Parser Expression
-annotatedExpP = do
-  e <- baseExpP
-  me <- optional (stringP ":" *> typeP)
-  case me of
-    Just t -> return (AnnotatedExpression (TSTypeWrapper t) e)
-    Nothing -> return e
 
 -- | Non-Primitive, Greedy
 prefixExpP :: Parser Expression
@@ -606,11 +664,11 @@ prefixExpP =
   tryChoice
     [ -- Lit . NumberLiteral <$> (NInfinity <$ stringIso "-Infinity"),
       UnaryOpPrefix <$> uopPrefixP <*> prefixExpP,
-      annotatedExpP
+      baseExpP
     ]
 
 -- | Primitive, Greedy
-postfixExpP :: Parser Expression
+postfixExpP :: Parser Expression -- TODO: Fix multiple prefix and postfix's not allowed
 postfixExpP = P.try $ do
   e <- prefixExpP
   me <- optional uopPostfix
@@ -652,27 +710,18 @@ constAssignmentP :: Parser Statement
 constAssignmentP = do
   _ <- stringIsoP "const"
   name <- nameP -- TODO: Support destructuring
-  expType <- tryOptional (stringP ":" *> typeP)
+  expType <- labeledTypeP
   _ <- stringP "="
-  exp <- expP
-  let finalExpr = case expType of
-        Nothing -> exp
-        Just t -> AnnotatedExpression (TSTypeWrapper t) exp
-  return (ConstAssignment (Name name) finalExpr)
+  ConstAssignment name (TSTypeWrapper <$> expType) <$> expP
 
 -- | Non-Primitive, Greedy
--- TODO: Support "let x;" and "let x: number;"
 letAssignmentP :: Parser Statement
 letAssignmentP = do
   _ <- stringIsoP "let"
   name <- nameP -- TODO: Support destructuring
-  expType <- tryOptional (stringP ":" *> typeP)
-  _ <- stringP "="
-  exp <- expP
-  let finalExpr = case expType of
-        Nothing -> exp
-        Just t -> AnnotatedExpression (TSTypeWrapper t) exp
-  return (LetAssignment (Name name) finalExpr)
+  expType <- labeledTypeP
+  exp <- tryOptional (stringP "=" *> expP)
+  return (LetAssignment name (TSTypeWrapper <$> expType) exp)
 
 -- | Primitive, Greedy
 blockOrStmtP :: Parser Block
@@ -706,7 +755,6 @@ ifP = do
   return (If ((cond, ifBlock) : elseIfs) elseBlock)
 
 -- | Primitive, Greedy
--- TODO: support `for (;;) {}` (e.g. empty expressions/statements)
 forAssignmentP :: Parser Statement
 forAssignmentP =
   tryChoice [constAssignmentP, letAssignmentP, AnyExpression <$> expP]
@@ -717,11 +765,11 @@ forP =
   For
     <$> ( stringIsoP "for"
             *> stringP "("
-            *> forAssignmentP
+            *> tryOptional forAssignmentP
             <* stringP ";"
         )
-    <*> (expP <* stringP ";")
-    <*> (expP <* stringP ")")
+    <*> (tryOptional expP <* stringP ";")
+    <*> (tryOptional expP <* stringP ")")
     <*> blockOrStmtP
 
 -- | Non-Primitive, Greedy
@@ -747,10 +795,14 @@ tryP = do
       [ -- Attempt to parse catch + optional finally
         do
           _ <- stringIsoP "catch"
-          e <- P.optional (parens expP)
+          err <- P.optional $ parens $ P.try $ do
+            n <- nameP
+            tp <- labeledTypeP
+            let fullTp = fromMaybe TAny tp
+            return (n, TSTypeWrapper fullTp)
           cblock <- braces blockP
           fblock <- P.option (Block []) (stringIsoP "finally" *> braces blockP)
-          return (e, cblock, fblock),
+          return (err, cblock, fblock),
         -- If no catch, try finally
         do
           fblock <- stringIsoP "finally" *> braces blockP
@@ -758,6 +810,16 @@ tryP = do
       ]
 
   return (Try b1 mbE b2 b3)
+
+-- | Non-Primitive, Greedy
+functionDeclarationP :: Parser Statement
+functionDeclarationP = do
+  stringIsoP "function"
+  name <- nameP
+  params <- map (second TSTypeWrapper) <$> parens functionParamListP
+  retType <- labeledTypeP
+  body <- braces blockP
+  return (FunctionDeclaration name params (TSTypeWrapper <$> retType) body)
 
 -- | Non-Primitive, Greedy
 returnP :: Parser Statement
@@ -799,6 +861,7 @@ statementP =
       breakP <* optional (stringP ";"),
       continueP <* optional (stringP ";"),
       tryP <* optional (stringP ";"),
+      functionDeclarationP <* optional (stringP ";"),
       returnP <* optional (stringP ";"),
       AnyExpression <$> expP <* optional (stringP ";"),
       emptyP
@@ -842,22 +905,25 @@ parseTSFile :: String -> IO (Either ParserError Block)
 parseTSFile = parseFromFile (const <$> blockP <*> P.eof)
 
 wVariables :: Block
-wVariables = Block [ConstAssignment (Name "num") (BinaryOp (Lit (NumberLiteral (Double 1.0))) PlusBop (Lit (NumberLiteral (Double 1.0)))), ConstAssignment (Name "str") (BinaryOp (Lit (StringLiteral "literal-string")) PlusBop (Lit (StringLiteral "concatenated"))), ConstAssignment (Name "boolTrue") (BinaryOp (Lit (BooleanLiteral True)) Or (Lit (BooleanLiteral False))), ConstAssignment (Name "boolFalse") (BinaryOp (Lit (BooleanLiteral True)) And (Lit (BooleanLiteral False)))]
+wVariables = Block [ConstAssignment "num" Nothing (BinaryOp (Lit (NumberLiteral (Double 1.0))) PlusBop (Lit (NumberLiteral (Double 1.0)))), ConstAssignment "str" Nothing (BinaryOp (Lit (StringLiteral "literal-string")) PlusBop (Lit (StringLiteral "concatenated"))), ConstAssignment "boolTrue" Nothing (BinaryOp (Lit (BooleanLiteral True)) Or (Lit (BooleanLiteral False))), ConstAssignment "boolFalse" Nothing (BinaryOp (Lit (BooleanLiteral True)) And (Lit (BooleanLiteral False)))]
 
 wObject :: Block
-wObject = Block [ConstAssignment (Name "obj") (Lit (ObjectLiteral (fromList [("key", Lit (StringLiteral "value")), ("nested", Lit (ObjectLiteral (fromList [("key", Lit (StringLiteral "value"))])))])))]
+wObject = Block [ConstAssignment "obj" Nothing (Lit (ObjectLiteral (fromList [("key", Lit (StringLiteral "value")), ("nested", Lit (ObjectLiteral (fromList [("key", Lit (StringLiteral "value"))])))])))]
 
 wConstLiterals :: Block
-wConstLiterals = Block [ConstAssignment (Name "num") (Lit (NumberLiteral (Double 42.0))), ConstAssignment (Name "str") (Lit (StringLiteral "literal-string")), ConstAssignment (Name "boolTrue") (Lit (BooleanLiteral True)), ConstAssignment (Name "boolFalse") (Lit (BooleanLiteral False))]
+wConstLiterals = Block [ConstAssignment "num" Nothing (Lit (NumberLiteral (Double 42.0))), ConstAssignment "str" Nothing (Lit (StringLiteral "literal-string")), ConstAssignment "boolTrue" Nothing (Lit (BooleanLiteral True)), ConstAssignment "boolFalse" Nothing (Lit (BooleanLiteral False))]
 
 wBfs :: Block
-wBfs = Block [ConstAssignment (Name "graph") (AnnotatedExpression (TSTypeWrapper (TArray (TArray TNumber))) (Array [Array [Lit (NumberLiteral (Double 1.0)), Lit (NumberLiteral (Double 2.0))], Array [Lit (NumberLiteral (Double 3.0)), Lit (NumberLiteral (Double 4.0))], Array [Lit (NumberLiteral (Double 5.0))], Array [], Array [Lit (NumberLiteral (Double 5.0))], Array []])), ConstAssignment (Name "queue") (AnnotatedExpression (TSTypeWrapper (TArray TNumber)) (Array [])), LetAssignment (Name "head") (Lit (NumberLiteral (Double 0.0))), LetAssignment (Name "tail") (Lit (NumberLiteral (Double 0.0))), ConstAssignment (Name "startNode") (Lit (NumberLiteral (Double 0.0))), AnyExpression (BinaryOp (Var (Element (Var (Name "queue")) (Var (Name "tail")))) Assign (Var (Name "startNode"))), AnyExpression (UnaryOpPostfix (Var (Name "tail")) IncPost), ConstAssignment (Name "visited") (AnnotatedExpression (TSTypeWrapper (TArray TBoolean)) (Array [Lit (BooleanLiteral False), Lit (BooleanLiteral False), Lit (BooleanLiteral False), Lit (BooleanLiteral False), Lit (BooleanLiteral False), Lit (BooleanLiteral False)])), AnyExpression (BinaryOp (Var (Element (Var (Name "visited")) (Var (Name "startNode")))) Assign (Lit (BooleanLiteral True))), While (BinaryOp (Var (Name "head")) Neq (Var (Name "tail"))) (Block [ConstAssignment (Name "currentNode") (Var (Element (Var (Name "queue")) (Var (Name "head")))), AnyExpression (UnaryOpPostfix (Var (Name "head")) IncPost), ConstAssignment (Name "neighbors") (Var (Element (Var (Name "graph")) (Var (Name "currentNode")))), For (LetAssignment (Name "i") (Lit (NumberLiteral (Double 0.0)))) (BinaryOp (Var (Name "i")) Lt (Var (Dot (Var (Name "neighbors")) "length"))) (UnaryOpPostfix (Var (Name "i")) IncPost) (Block [ConstAssignment (Name "neighbor") (Var (Element (Var (Name "neighbors")) (Var (Name "i")))), If [(UnaryOpPrefix Not (Var (Element (Var (Name "visited")) (Var (Name "neighbor")))), Block [AnyExpression (BinaryOp (Var (Element (Var (Name "visited")) (Var (Name "neighbor")))) Assign (Lit (BooleanLiteral True))), AnyExpression (BinaryOp (Var (Element (Var (Name "queue")) (Var (Name "tail")))) Assign (Var (Name "neighbor"))), AnyExpression (UnaryOpPostfix (Var (Name "tail")) IncPost)])] (Block [])])])]
+wBfs = Block [ConstAssignment "graph" (Just (TSTypeWrapper (TArray (TArray TNumber)))) (Array [Array [Lit (NumberLiteral (Double 1.0)), Lit (NumberLiteral (Double 2.0))], Array [Lit (NumberLiteral (Double 3.0)), Lit (NumberLiteral (Double 4.0))], Array [Lit (NumberLiteral (Double 5.0))], Array [], Array [Lit (NumberLiteral (Double 5.0))], Array []]), ConstAssignment "queue" (Just (TSTypeWrapper (TArray TNumber))) (Array []), LetAssignment "head" Nothing (Just (Lit (NumberLiteral (Double 0.0)))), LetAssignment "tail" Nothing (Just (Lit (NumberLiteral (Double 0.0)))), ConstAssignment "startNode" Nothing (Lit (NumberLiteral (Double 0.0))), AnyExpression (BinaryOp (Var (Element (Var (Name "queue")) (Var (Name "tail")))) Assign (Var (Name "startNode"))), AnyExpression (UnaryOpPostfix (Var (Name "tail")) IncPost), ConstAssignment "visited" (Just (TSTypeWrapper (TArray TBoolean))) (Array [Lit (BooleanLiteral False), Lit (BooleanLiteral False), Lit (BooleanLiteral False), Lit (BooleanLiteral False), Lit (BooleanLiteral False), Lit (BooleanLiteral False)]), AnyExpression (BinaryOp (Var (Element (Var (Name "visited")) (Var (Name "startNode")))) Assign (Lit (BooleanLiteral True))), While (BinaryOp (Var (Name "head")) Neq (Var (Name "tail"))) (Block [ConstAssignment "currentNode" Nothing (Var (Element (Var (Name "queue")) (Var (Name "head")))), AnyExpression (UnaryOpPostfix (Var (Name "head")) IncPost), ConstAssignment "neighbors" Nothing (Var (Element (Var (Name "graph")) (Var (Name "currentNode")))), For (Just (LetAssignment "i" Nothing (Just (Lit (NumberLiteral (Double 0.0)))))) (Just (BinaryOp (Var (Name "i")) Lt (Var (Dot (Var (Name "neighbors")) "length")))) (Just (UnaryOpPostfix (Var (Name "i")) IncPost)) (Block [ConstAssignment "neighbor" Nothing (Var (Element (Var (Name "neighbors")) (Var (Name "i")))), If [(UnaryOpPrefix Not (Var (Element (Var (Name "visited")) (Var (Name "neighbor")))), Block [AnyExpression (BinaryOp (Var (Element (Var (Name "visited")) (Var (Name "neighbor")))) Assign (Lit (BooleanLiteral True))), AnyExpression (BinaryOp (Var (Element (Var (Name "queue")) (Var (Name "tail")))) Assign (Var (Name "neighbor"))), AnyExpression (UnaryOpPostfix (Var (Name "tail")) IncPost)])] (Block [])])])]
 
 wLiteralsSimple :: Block
-wLiteralsSimple = Block [ConstAssignment (Name "num") (Lit (NumberLiteral (Double 42.0))), ConstAssignment (Name "str") (Lit (StringLiteral "literal-string")), ConstAssignment (Name "boolTrue") (AnnotatedExpression (TSTypeWrapper (TBooleanLiteral False)) (Lit (BooleanLiteral True))), ConstAssignment (Name "boolFalse") (AnnotatedExpression (TSTypeWrapper TBoolean) (Lit (BooleanLiteral False))), ConstAssignment (Name "arrOfNum") (Array [Lit (NumberLiteral (Double 1.0)), Lit (NumberLiteral (Double 2.0)), Lit (NumberLiteral (Double 3.0))]), ConstAssignment (Name "arrOfStr") (Array [Lit (StringLiteral "a"), Lit (StringLiteral "b"), Lit (StringLiteral "c")]), ConstAssignment (Name "arrOfBool") (Array [Lit (BooleanLiteral True), Lit (BooleanLiteral False), Lit (BooleanLiteral True)]), ConstAssignment (Name "nullLiteral") (Lit NullLiteral), ConstAssignment (Name "decimal") (AnnotatedExpression (TSTypeWrapper TNumber) (Lit (NumberLiteral (Double 42.0)))), ConstAssignment (Name "decimalFloat") (UnaryOpPrefix MinusUop (Lit (NumberLiteral (Double 42.42)))), ConstAssignment (Name "binary") (Lit (NumberLiteral (Double 42.0))), ConstAssignment (Name "octal") (AnnotatedExpression (TSTypeWrapper TString) (UnaryOpPrefix MinusUop (Lit (NumberLiteral (Double 42.0))))), ConstAssignment (Name "hexadecimal") (Lit (NumberLiteral (Double 42.0))), ConstAssignment (Name "scientific") (BinaryOp (BinaryOp (BinaryOp (BinaryOp (UnaryOpPrefix MinusUop (Lit (NumberLiteral (Double 42.0)))) Times (BinaryOp (Lit (NumberLiteral (Double 100.0))) Exp (Lit (NumberLiteral (Double 2.0))))) LeftShift (Lit (NumberLiteral (Double 4.0)))) Div (Lit (NumberLiteral (Double 4.2)))) BitOr (Lit (NumberLiteral (Double 93.0)))), ConstAssignment (Name "scientificNegative") (Lit (NumberLiteral (Double 0.42000000000000004))), ConstAssignment (Name "infinity") (Lit (NumberLiteral Infinity)), ConstAssignment (Name "negativeInfinity") (UnaryOpPrefix MinusUop (Lit (NumberLiteral Infinity))), ConstAssignment (Name "nan") (Lit (NumberLiteral NaN)), For (LetAssignment (Name "x") (Lit (NumberLiteral (Double 0.0)))) (BinaryOp (Var (Name "x")) Lt (Lit (NumberLiteral (Double 10.0)))) (UnaryOpPostfix (Var (Name "x")) IncPost) (Block [AnyExpression (BinaryOp (Var (Name "i")) Assign (Var (Name "x")))]), If [(Lit (BooleanLiteral True), Block [LetAssignment (Name "val") (Lit (StringLiteral "5 == 6"))]), (BinaryOp (BinaryOp (Lit (NumberLiteral (Double 5.0))) MinusBop (Lit (NumberLiteral (Double 7.0)))) Lt (Lit (NumberLiteral (Double 21.0))), Block [AnyExpression (BinaryOp (Var (Name "val2")) Assign (Lit (BooleanLiteral True)))])] (Block []), Try (Block [AnyExpression (BinaryOp (Lit (NumberLiteral (Double 5.0))) PlusBop (Lit (NumberLiteral (Double 6.0))))]) (Just (AnnotatedExpression (TSTypeWrapper TAny) (Var (Name "a")))) (Block [ConstAssignment (Name "names") (Array [Lit (StringLiteral "a"), Lit (StringLiteral "b"), Lit (StringLiteral "c")])]) (Block [])]
+wLiteralsSimple = Block [ConstAssignment "num" Nothing (Lit (NumberLiteral (Double 42.0))), ConstAssignment "str" Nothing (Lit (StringLiteral "literal-string")), ConstAssignment "boolTrue" (Just (TSTypeWrapper (TBooleanLiteral False))) (Lit (BooleanLiteral True)), ConstAssignment "boolFalse" (Just (TSTypeWrapper TBoolean)) (Lit (BooleanLiteral False)), ConstAssignment "arrOfNum" Nothing (Array [Lit (NumberLiteral (Double 1.0)), Lit (NumberLiteral (Double 2.0)), Lit (NumberLiteral (Double 3.0))]), ConstAssignment "arrOfStr" Nothing (Array [Lit (StringLiteral "a"), Lit (StringLiteral "b"), Lit (StringLiteral "c")]), ConstAssignment "arrOfBool" Nothing (Array [Lit (BooleanLiteral True), Lit (BooleanLiteral False), Lit (BooleanLiteral True)]), ConstAssignment "nullLiteral" Nothing (Lit NullLiteral), ConstAssignment "decimal" (Just (TSTypeWrapper TNumber)) (Lit (NumberLiteral (Double 42.0))), ConstAssignment "decimalFloat" Nothing (UnaryOpPrefix MinusUop (Lit (NumberLiteral (Double 42.42)))), ConstAssignment "binary" Nothing (Lit (NumberLiteral (Double 42.0))), ConstAssignment "octal" (Just (TSTypeWrapper TString)) (UnaryOpPrefix MinusUop (Lit (NumberLiteral (Double 42.0)))), ConstAssignment "hexadecimal" Nothing (Lit (NumberLiteral (Double 42.0))), ConstAssignment "scientific" Nothing (BinaryOp (BinaryOp (BinaryOp (BinaryOp (UnaryOpPrefix MinusUop (Lit (NumberLiteral (Double 42.0)))) Times (BinaryOp (Lit (NumberLiteral (Double 100.0))) Exp (Lit (NumberLiteral (Double 2.0))))) LeftShift (Lit (NumberLiteral (Double 4.0)))) Div (Lit (NumberLiteral (Double 4.2)))) BitOr (Lit (NumberLiteral (Double 93.0)))), ConstAssignment "scientificNegative" Nothing (Lit (NumberLiteral (Double 0.42000000000000004))), ConstAssignment "infinity" Nothing (Lit (NumberLiteral Infinity)), ConstAssignment "negativeInfinity" Nothing (UnaryOpPrefix MinusUop (Lit (NumberLiteral Infinity))), ConstAssignment "nan" Nothing (Lit (NumberLiteral NaN)), For (Just (LetAssignment "x" Nothing (Just (Lit (NumberLiteral (Double 0.0)))))) (Just (BinaryOp (Var (Name "x")) Lt (Lit (NumberLiteral (Double 10.0))))) (Just (UnaryOpPostfix (Var (Name "x")) IncPost)) (Block [AnyExpression (BinaryOp (Var (Name "i")) Assign (Var (Name "x")))]), If [(Lit (BooleanLiteral True), Block [LetAssignment "val" Nothing (Just (Lit (StringLiteral "5 == 6")))]), (BinaryOp (BinaryOp (Lit (NumberLiteral (Double 5.0))) MinusBop (Lit (NumberLiteral (Double 7.0)))) Lt (Lit (NumberLiteral (Double 21.0))), Block [AnyExpression (BinaryOp (Var (Name "val2")) Assign (Lit (BooleanLiteral True)))])] (Block []), Try (Block [AnyExpression (BinaryOp (Lit (NumberLiteral (Double 5.0))) PlusBop (Lit (NumberLiteral (Double 6.0))))]) (Just ("a", TSTypeWrapper TAny)) (Block [ConstAssignment "names" Nothing (Array [Lit (StringLiteral "a"), Lit (StringLiteral "b"), Lit (StringLiteral "c")])]) (Block []), Try (Block [AnyExpression (BinaryOp (Lit (NumberLiteral (Double 5.0))) PlusBop (Lit (NumberLiteral (Double 6.0))))]) (Just ("a", TSTypeWrapper TAny)) (Block [ConstAssignment "names" Nothing (Array [Lit (StringLiteral "a"), Lit (StringLiteral "b"), Lit (StringLiteral "c")])]) (Block [])]
 
 wLiterals :: Block
-wLiterals = Block [ConstAssignment (Name "num") (Lit (NumberLiteral (Double 42.0))), ConstAssignment (Name "str") (Lit (StringLiteral "literal-string")), ConstAssignment (Name "boolTrue") (AnnotatedExpression (TSTypeWrapper (TBooleanLiteral False)) (Lit (BooleanLiteral True))), ConstAssignment (Name "boolFalse") (AnnotatedExpression (TSTypeWrapper TBoolean) (Lit (BooleanLiteral False))), ConstAssignment (Name "constObj") (AnnotatedExpression (TSTypeWrapper (TTuple [TNumber, TBoolean])) (Lit (ObjectLiteral (fromList [("key", Lit (StringLiteral "value"))])))), ConstAssignment (Name "obj") (Lit (ObjectLiteral (fromList [("key", Lit (StringLiteral "value")), ("key2", Lit (NumberLiteral (Double 42.0)))]))), ConstAssignment (Name "arrOfNum") (Array [Lit (NumberLiteral (Double 1.0)), Lit (NumberLiteral (Double 2.0)), Lit (NumberLiteral (Double 3.0))]), ConstAssignment (Name "arrOfStr") (Array [Lit (StringLiteral "a"), Lit (StringLiteral "b"), Lit (StringLiteral "c")]), ConstAssignment (Name "arrOfBool") (Array [Lit (BooleanLiteral True), Lit (BooleanLiteral False), Lit (BooleanLiteral True)]), ConstAssignment (Name "arrOfObj") (Array [Lit (ObjectLiteral (fromList [("key", Lit (StringLiteral "value"))])), Lit (ObjectLiteral (fromList [("key", Lit (StringLiteral "value"))]))]), ConstAssignment (Name "arrOfArr") (Array [Array [Lit (NumberLiteral (Double 1.0)), Lit (NumberLiteral (Double 2.0)), Lit (NumberLiteral (Double 3.0))], Array [Lit (StringLiteral "a"), Lit (StringLiteral "b"), Lit (StringLiteral "c")]]), ConstAssignment (Name "arrOfMixed") (Array [Lit (NumberLiteral (Double 1.0)), Lit (StringLiteral "a"), Lit (BooleanLiteral True), Lit (ObjectLiteral (fromList [("key", Lit (StringLiteral "value"))])), Array [Lit (NumberLiteral (Double 1.0)), Lit (NumberLiteral (Double 2.0)), Lit (NumberLiteral (Double 3.0))]]), ConstAssignment (Name "nullLiteral") (Lit NullLiteral), ConstAssignment (Name "decimal") (AnnotatedExpression (TSTypeWrapper TNumber) (Lit (NumberLiteral (Double 42.0)))), ConstAssignment (Name "decimalFloat") (UnaryOpPrefix MinusUop (Lit (NumberLiteral (Double 42.42)))), ConstAssignment (Name "binary") (Lit (NumberLiteral (Double 42.0))), ConstAssignment (Name "octal") (AnnotatedExpression (TSTypeWrapper TString) (UnaryOpPrefix MinusUop (Lit (NumberLiteral (Double 42.0))))), ConstAssignment (Name "hexadecimal") (Lit (NumberLiteral (Double 42.0))), ConstAssignment (Name "scientific") (BinaryOp (BinaryOp (BinaryOp (BinaryOp (UnaryOpPrefix MinusUop (Lit (NumberLiteral (Double 42.0)))) Times (BinaryOp (Lit (NumberLiteral (Double 100.0))) Exp (Lit (NumberLiteral (Double 2.0))))) LeftShift (Lit (NumberLiteral (Double 4.0)))) Div (Lit (NumberLiteral (Double 4.2)))) BitOr (Lit (NumberLiteral (Double 93.0)))), ConstAssignment (Name "scientificNegative") (Lit (NumberLiteral (Double 0.42000000000000004))), ConstAssignment (Name "infinity") (Lit (NumberLiteral Infinity)), ConstAssignment (Name "negativeInfinity") (UnaryOpPrefix MinusUop (Lit (NumberLiteral Infinity))), ConstAssignment (Name "nan") (Lit (NumberLiteral NaN)), TypeAlias "Test1" (TSTypeWrapper (TUserObject (fromList [("test", TIntersection [TTuple [TNumberLiteral 5.0, TNumberLiteral 3.0], TTuple [TStringLiteral "test", TArray (TNumberLiteral 4.0), TString]])]))), InterfaceDeclaration "Test2" (TSTypeWrapper (TUserObject (fromList [("test", TNumberLiteral 5.0)]))), ConstAssignment (Name "test1") (AnnotatedExpression (TSTypeWrapper (TTypeAlias "Test2")) (Lit (ObjectLiteral (fromList [("test", Lit (NumberLiteral (Double 5.0)))])))), For (LetAssignment (Name "x") (Lit (NumberLiteral (Double 0.0)))) (BinaryOp (Var (Name "x")) Lt (Lit (NumberLiteral (Double 10.0)))) (UnaryOpPostfix (Var (Name "x")) IncPost) (Block [AnyExpression (BinaryOp (Var (Name "i")) Assign (Var (Name "x")))]), If [(Lit (BooleanLiteral True), Block [LetAssignment (Name "val") (Lit (StringLiteral "5 == 6"))]), (BinaryOp (BinaryOp (Lit (NumberLiteral (Double 5.0))) MinusBop (Lit (NumberLiteral (Double 7.0)))) Lt (Lit (NumberLiteral (Double 21.0))), Block [AnyExpression (BinaryOp (Var (Name "val2")) Assign (Lit (BooleanLiteral True)))])] (Block [AnyExpression (BinaryOp (Var (Name "test1")) Assign (Lit (BooleanLiteral True)))]), If [(Lit (BooleanLiteral False), Block [LetAssignment (Name "val") (Lit (StringLiteral "5 != 6"))]), (BinaryOp (BinaryOp (Lit (NumberLiteral (Double 5.0))) MinusBop (Lit (NumberLiteral (Double 7.0)))) Gt (Lit (NumberLiteral (Double 21.0))), Block [AnyExpression (BinaryOp (Var (Name "val3")) Assign (Lit (BooleanLiteral False)))])] (Block []), If [(BinaryOp (Lit (NumberLiteral (Double 5.0))) Eq (Lit (NumberLiteral (Double 6.0))), Block [LetAssignment (Name "val") (Lit (StringLiteral "5 != 6"))])] (Block [LetAssignment (Name "val") (Lit (StringLiteral "5 == 6"))]), While (Lit (BooleanLiteral True)) (Block [LetAssignment (Name "val") (Lit (StringLiteral "5 == 6"))]), Try (Block [AnyExpression (BinaryOp (Lit (NumberLiteral (Double 5.0))) PlusBop (Lit (NumberLiteral (Double 6.0))))]) (Just (AnnotatedExpression (TSTypeWrapper TAny) (Var (Name "a")))) (Block [ConstAssignment (Name "names") (Array [Lit (StringLiteral "a"), Lit (StringLiteral "b"), Lit (StringLiteral "c")])]) (Block []), Try (Block [AnyExpression (BinaryOp (Lit (NumberLiteral (Double 5.0))) PlusBop (Lit (NumberLiteral (Double 6.0))))]) Nothing (Block [ConstAssignment (Name "names") (Array [Lit (StringLiteral "a"), Lit (StringLiteral "b"), Lit (StringLiteral "c")])]) (Block [LetAssignment (Name "val") (Lit (NumberLiteral (Double 7.0)))]), Try (Block [AnyExpression (BinaryOp (Lit (NumberLiteral (Double 5.0))) PlusBop (Lit (NumberLiteral (Double 6.0))))]) Nothing (Block []) (Block [LetAssignment (Name "val") (Lit (NumberLiteral (Double 7.0)))]), TypeAlias "MyType" (TSTypeWrapper (TUnion [TNumber, TString, TBoolean])), ConstAssignment (Name "test") (AnnotatedExpression (TSTypeWrapper (TTypeAlias "MyType")) (Lit (NumberLiteral (Double 5.0)))), TypeAlias "MyType2" (TSTypeWrapper (TUserObject (fromList [("field1", TNumber), ("field2", TUnion [TString, TUndefined]), ("field3", TUnion [TBoolean, TTypeAlias "MyType"]), ("field4", TArray (TUnion [TNumber, TUnion [TTypeAlias "MyType2", TTypeAlias "MyType"]])), ("test field", TNumberLiteral 5.0)]))), InterfaceDeclaration "MyType3" (TSTypeWrapper (TUserObject (fromList [("field1", TNumber), ("field2", TString), ("field3", TUnion [TUnion [TBoolean, TTypeAlias "MyType"], TUndefined]), ("field4", TUnion [TUnion [TNumber, TArray (TUnion [TTypeAlias "MyType2", TTypeAlias "MyType"])], TUndefined])])))]
+wLiterals = Block [ConstAssignment "num" Nothing (Lit (NumberLiteral (Double 42.0))), ConstAssignment "str" Nothing (Lit (StringLiteral "literal-string")), ConstAssignment "boolTrue" (Just (TSTypeWrapper (TBooleanLiteral False))) (Lit (BooleanLiteral True)), ConstAssignment "boolFalse" (Just (TSTypeWrapper TBoolean)) (Lit (BooleanLiteral False)), ConstAssignment "constObj" (Just (TSTypeWrapper (TTuple [TNumber, TBoolean]))) (Lit (ObjectLiteral (fromList [("key", Lit (StringLiteral "value"))]))), ConstAssignment "obj" Nothing (Lit (ObjectLiteral (fromList [("key", Lit (StringLiteral "value")), ("key2", Lit (NumberLiteral (Double 42.0)))]))), ConstAssignment "arrOfNum" Nothing (Array [Lit (NumberLiteral (Double 1.0)), Lit (NumberLiteral (Double 2.0)), Lit (NumberLiteral (Double 3.0))]), ConstAssignment "arrOfStr" Nothing (Array [Lit (StringLiteral "a"), Lit (StringLiteral "b"), Lit (StringLiteral "c")]), ConstAssignment "arrOfBool" Nothing (Array [Lit (BooleanLiteral True), Lit (BooleanLiteral False), Lit (BooleanLiteral True)]), ConstAssignment "arrOfObj" Nothing (Array [Lit (ObjectLiteral (fromList [("key", Lit (StringLiteral "value"))])), Lit (ObjectLiteral (fromList [("key", Lit (StringLiteral "value"))]))]), ConstAssignment "arrOfArr" Nothing (Array [Array [Lit (NumberLiteral (Double 1.0)), Lit (NumberLiteral (Double 2.0)), Lit (NumberLiteral (Double 3.0))], Array [Lit (StringLiteral "a"), Lit (StringLiteral "b"), Lit (StringLiteral "c")]]), ConstAssignment "arrOfMixed" Nothing (Array [Lit (NumberLiteral (Double 1.0)), Lit (StringLiteral "a"), Lit (BooleanLiteral True), Lit (ObjectLiteral (fromList [("key", Lit (StringLiteral "value"))])), Array [Lit (NumberLiteral (Double 1.0)), Lit (NumberLiteral (Double 2.0)), Lit (NumberLiteral (Double 3.0))]]), ConstAssignment "nullLiteral" Nothing (Lit NullLiteral), ConstAssignment "decimal" (Just (TSTypeWrapper TNumber)) (Lit (NumberLiteral (Double 42.0))), ConstAssignment "decimalFloat" Nothing (UnaryOpPrefix MinusUop (Lit (NumberLiteral (Double 42.42)))), ConstAssignment "binary" Nothing (Lit (NumberLiteral (Double 42.0))), ConstAssignment "octal" (Just (TSTypeWrapper TString)) (UnaryOpPrefix MinusUop (Lit (NumberLiteral (Double 42.0)))), ConstAssignment "hexadecimal" Nothing (Lit (NumberLiteral (Double 42.0))), ConstAssignment "scientific" Nothing (BinaryOp (BinaryOp (BinaryOp (BinaryOp (UnaryOpPrefix MinusUop (Lit (NumberLiteral (Double 42.0)))) Times (BinaryOp (Lit (NumberLiteral (Double 100.0))) Exp (Lit (NumberLiteral (Double 2.0))))) LeftShift (Lit (NumberLiteral (Double 4.0)))) Div (Lit (NumberLiteral (Double 4.2)))) BitOr (Lit (NumberLiteral (Double 93.0)))), ConstAssignment "scientificNegative" Nothing (Lit (NumberLiteral (Double 0.42000000000000004))), ConstAssignment "infinity" Nothing (Lit (NumberLiteral Infinity)), ConstAssignment "negativeInfinity" Nothing (UnaryOpPrefix MinusUop (Lit (NumberLiteral Infinity))), ConstAssignment "nan" Nothing (Lit (NumberLiteral NaN)), TypeAlias "Test1" (TSTypeWrapper (TUserObject (fromList [("test", TIntersection [TTuple [TNumberLiteral 5.0, TNumberLiteral 3.0], TTuple [TStringLiteral "test", TArray (TNumberLiteral 4.0), TString]])]))), InterfaceDeclaration "Test2" (TSTypeWrapper (TUserObject (fromList [("test", TNumberLiteral 5.0)]))), ConstAssignment "test1" (Just (TSTypeWrapper (TTypeAlias "Test2"))) (Lit (ObjectLiteral (fromList [("test", Lit (NumberLiteral (Double 5.0)))]))), For (Just (LetAssignment "x" Nothing (Just (Lit (NumberLiteral (Double 0.0)))))) (Just (BinaryOp (Var (Name "x")) Lt (Lit (NumberLiteral (Double 10.0))))) (Just (UnaryOpPostfix (Var (Name "x")) IncPost)) (Block [AnyExpression (BinaryOp (Var (Name "i")) Assign (Var (Name "x")))]), If [(Lit (BooleanLiteral True), Block [LetAssignment "val" Nothing (Just (Lit (StringLiteral "5 == 6")))]), (BinaryOp (BinaryOp (Lit (NumberLiteral (Double 5.0))) MinusBop (Lit (NumberLiteral (Double 7.0)))) Lt (Lit (NumberLiteral (Double 21.0))), Block [AnyExpression (BinaryOp (Var (Name "val2")) Assign (Lit (BooleanLiteral True)))])] (Block [AnyExpression (BinaryOp (Var (Name "test1")) Assign (Lit (BooleanLiteral True)))]), If [(Lit (BooleanLiteral False), Block [LetAssignment "val" Nothing (Just (Lit (StringLiteral "5 != 6")))]), (BinaryOp (BinaryOp (Lit (NumberLiteral (Double 5.0))) MinusBop (Lit (NumberLiteral (Double 7.0)))) Gt (Lit (NumberLiteral (Double 21.0))), Block [AnyExpression (BinaryOp (Var (Name "val3")) Assign (Lit (BooleanLiteral False)))])] (Block []), If [(BinaryOp (Lit (NumberLiteral (Double 5.0))) Eq (Lit (NumberLiteral (Double 6.0))), Block [LetAssignment "val" Nothing (Just (Lit (StringLiteral "5 != 6")))])] (Block [LetAssignment "val" Nothing (Just (Lit (StringLiteral "5 == 6")))]), While (Lit (BooleanLiteral True)) (Block [LetAssignment "val" Nothing (Just (Lit (StringLiteral "5 == 6")))]), Try (Block [AnyExpression (BinaryOp (Lit (NumberLiteral (Double 5.0))) PlusBop (Lit (NumberLiteral (Double 6.0))))]) (Just ("a", TSTypeWrapper TAny)) (Block [ConstAssignment "names" Nothing (Array [Lit (StringLiteral "a"), Lit (StringLiteral "b"), Lit (StringLiteral "c")])]) (Block []), Try (Block [AnyExpression (BinaryOp (Lit (NumberLiteral (Double 5.0))) PlusBop (Lit (NumberLiteral (Double 6.0))))]) Nothing (Block [ConstAssignment "names" Nothing (Array [Lit (StringLiteral "a"), Lit (StringLiteral "b"), Lit (StringLiteral "c")])]) (Block [LetAssignment "val" Nothing (Just (Lit (NumberLiteral (Double 7.0))))]), Try (Block [AnyExpression (BinaryOp (Lit (NumberLiteral (Double 5.0))) PlusBop (Lit (NumberLiteral (Double 6.0))))]) Nothing (Block []) (Block [LetAssignment "val" Nothing (Just (Lit (NumberLiteral (Double 7.0))))]), TypeAlias "MyType" (TSTypeWrapper (TUnion [TNumber, TString, TBoolean])), ConstAssignment "test" (Just (TSTypeWrapper (TTypeAlias "MyType"))) (Lit (NumberLiteral (Double 5.0))), TypeAlias "MyType2" (TSTypeWrapper (TUserObject (fromList [("field1", TNumber), ("field2", TUnion [TString, TUndefined]), ("field3", TUnion [TBoolean, TTypeAlias "MyType"]), ("field4", TArray (TUnion [TNumber, TUnion [TTypeAlias "MyType2", TTypeAlias "MyType"]])), ("test field", TNumberLiteral 5.0)]))), InterfaceDeclaration "MyType3" (TSTypeWrapper (TUserObject (fromList [("field1", TNumber), ("field2", TString), ("field3", TUnion [TUnion [TBoolean, TTypeAlias "MyType"], TUndefined]), ("field4", TUnion [TUnion [TNumber, TArray (TUnion [TTypeAlias "MyType2", TTypeAlias "MyType"])], TUndefined])])))]
+
+wFunctions :: Block
+wFunctions = Block [ConstAssignment "f1" Nothing (FunctionInlineDeclaration [("x", TSTypeWrapper TAny)] Nothing (Block [AnyExpression (FunctionCall (Dot (Var (Name "console")) "log") [Var (Name "x")])])), FunctionDeclaration "f2" [("x", TSTypeWrapper TAny)] Nothing (Block [AnyExpression (FunctionCall (Dot (Var (Name "console")) "log") [Var (Name "x")])]), FunctionDeclaration "f25" [("x", TSTypeWrapper TAny)] (Just (TSTypeWrapper TVoid)) (Block [AnyExpression (FunctionCall (Dot (Var (Name "console")) "log") [Var (Name "x")])]), ConstAssignment "f3" Nothing (FunctionInlineDeclaration [("x", TSTypeWrapper TAny)] Nothing (Block [AnyExpression (FunctionCall (Dot (Var (Name "console")) "log") [Var (Name "x")])])), LetAssignment "f4" Nothing (Just (FunctionInlineDeclaration [("x", TSTypeWrapper TAny), ("x2", TSTypeWrapper TNumber)] (Just (TSTypeWrapper TVoid)) (Block [AnyExpression (FunctionCall (Dot (Var (Name "console")) "log") [Var (Name "x")])]))), LetAssignment "f5" Nothing (Just (FunctionInlineDeclaration [("x", TSTypeWrapper TAny)] Nothing (Block [AnyExpression (FunctionCall (Dot (Var (Name "console")) "log") [Var (Name "x")])]))), LetAssignment "myAdd" (Just (TSTypeWrapper (TFunction [("baseValue", TNumber), ("increment", TNumber)] TNumber))) (Just (FunctionInlineDeclaration [("x", TSTypeWrapper TNumber), ("y", TSTypeWrapper TNumber)] (Just (TSTypeWrapper TNumber)) (Block [Return (Just (BinaryOp (Var (Name "x")) PlusBop (Var (Name "y"))))]))), FunctionDeclaration "myAdd2" [("x", TSTypeWrapper TNumber), ("y", TSTypeWrapper TNumber)] (Just (TSTypeWrapper TNumber)) (Block [Return (Just (BinaryOp (Var (Name "x")) PlusBop (Var (Name "y"))))]), FunctionDeclaration "myAdd3" [("x", TSTypeWrapper TNumber), ("y", TSTypeWrapper TNumber)] Nothing (Block [Return (Just (BinaryOp (Var (Name "x")) PlusBop (Var (Name "y"))))]), AnyExpression (FunctionCall (Name "f1") [Lit (NumberLiteral (Double 5.0))]), AnyExpression (FunctionCall (Name "f2") [Lit (NumberLiteral (Double 5.0))]), AnyExpression (FunctionCall (Name "f3") [Lit (NumberLiteral (Double 5.0))]), AnyExpression (FunctionCall (Name "f4") [Lit (NumberLiteral (Double 5.0)), Lit (NumberLiteral (Double 6.0))]), AnyExpression (FunctionCall (Name "f5") [Lit (NumberLiteral (Double 5.0))]), TypeAlias "GreetFunction" (TSTypeWrapper (TFunction [("a", TString)] TVoid)), TypeAlias "GreetFunction2" (TSTypeWrapper (TFunction [("a", TAny)] TVoid)), InterfaceDeclaration "Deck" (TSTypeWrapper (TUserObject (fromList [("a", TAny), ("cards", TArray TNumber), ("crazy function", TUnion [TFunction [("onclick", TFunction [("value", TString), ("e", TTypeAlias "Event")] TVoid)] TVoid, TUndefined]), ("createCardPicker", TFunction [("value", TNumber)] (TFunction [] TString)), ("createCardPicker2", TFunction [("value", TNumber)] (TFunction [] TString)), ("other", TFunction [("value", TString)] TVoid), ("suits", TArray TString)]))), For Nothing Nothing (Just (FunctionInlineDeclaration [("x", TSTypeWrapper TAny)] Nothing (Block [AnyExpression (FunctionCall (Dot (Var (Name "console")) "log") [Var (Name "x")])]))) (Block [])]
 
 tParseFiles :: Test
 tParseFiles =
@@ -868,7 +934,8 @@ tParseFiles =
         "const-literals.ts" ~: p "test/const-literals.ts" wConstLiterals,
         "bfs.ts" ~: p "test/bfs.ts" wBfs,
         "literals-simple.ts" ~: p "test/literals-simple.ts" wLiteralsSimple,
-        "literals.ts" ~: p "test/literals.ts" wLiterals
+        "literals.ts" ~: p "test/literals.ts" wLiterals,
+        "functions.ts" ~: p "test/functions.ts" wFunctions
       ]
   where
     p fn ast = do
@@ -946,15 +1013,15 @@ test_stat :: Test
 test_stat =
   "parsing statements"
     ~: TestList
-      [ parse statementP "const x = 3" ~?= Right (ConstAssignment (Name "x") (Lit (NumberLiteral (Double 3)))),
+      [ parse statementP "const x = 3" ~?= Right (ConstAssignment "x" Nothing (Lit (NumberLiteral (Double 3)))),
         parse statementP "if (x) { let y = undefined; } else { const y = null }"
           ~?= Right
             ( If
                 [ ( Var (Name "x"),
-                    Block [LetAssignment (Name "y") (Lit UndefinedLiteral)]
+                    Block [LetAssignment "y" Nothing (Just (Lit UndefinedLiteral))]
                   )
                 ]
-                (Block [ConstAssignment (Name "y") (Lit NullLiteral)])
+                (Block [ConstAssignment "y" Nothing (Lit NullLiteral)])
             )
       ]
 

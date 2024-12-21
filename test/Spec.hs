@@ -15,6 +15,7 @@ import TSError
 import TSGen
 import TSNumber
 import TSParser
+import TSPretty
 import TSSyntax
 import TSType
 import TSTypeChecker
