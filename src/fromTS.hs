@@ -3,6 +3,7 @@ module FromTS where
 import Data.Map
 import TSError (Error (SyntaxError, TypeError))
 import TSParser
+import TSPretty
 import TSSyntax
 import TSType
 import TSTypeChecker (typeCheckProgram)

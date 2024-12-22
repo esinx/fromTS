@@ -41,6 +41,7 @@ data TSType
   | TTuple [TSType] -- [T, U, ...]
   | TBracket -- {}
   | TObject -- object
+  | TFunction [(Name, TSType)] TSType -- function
   | TTypeAlias Name -- type alias
   | TUserObject (Map String TSType)
   | TUnknown -- proper top
